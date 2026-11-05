@@ -1,0 +1,26 @@
+# Old frontend, kept locally as a reference only
+frontend_old/
+
+# Dependencies and build output
+node_modules/
+dist/
+
+# Secrets and local settings
+.env
+.env.*
+*.env
+*.key
+*.pem
+.claude/
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
