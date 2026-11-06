@@ -9,6 +9,11 @@ from html import escape
 from html.parser import HTMLParser
 
 
+# What the parser leaves unread when the text ends inside a tag. Python versions treat it
+# differently: some keep it as text, others drop it silently, so it is rejected here.
+UNFINISHED_MARKUP_RE = re.compile(r"<[a-zA-Z/!?]")
+
+
 class SanitizeError(ValueError):
     pass
 
@@ -31,7 +36,13 @@ class MessageSanitizer(HTMLParser):
     @classmethod
     def clean(cls, text: str) -> str:
         sanitizer = cls()
-        sanitizer.feed(text)
+        try:
+            sanitizer.feed(text)
+        except AssertionError:
+            # How older Python versions report some of the markup after "<![".
+            raise SanitizeError("Некорректная разметка.")
+        if UNFINISHED_MARKUP_RE.match(sanitizer.rawdata):
+            raise SanitizeError("Тег в конце текста не завершён. Знак «<» можно записать как &lt;.")
         sanitizer.close()
         if sanitizer._stack:
             raise SanitizeError(f"Тег <{sanitizer._stack[-1]}> не закрыт.")

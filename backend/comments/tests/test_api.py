@@ -9,10 +9,21 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import AsyncClient, TransactionTestCase
 from PIL import Image
 
-from comments import queries
+from comments import captcha, queries, ratelimit
 from comments.models import Author, Comment
 
-from .helpers import CREATE, bearer, error_of, form, graphql, make_author, make_comment, post, solved_captcha
+from .helpers import (
+    CREATE,
+    bearer,
+    error_of,
+    form,
+    graphql,
+    make_author,
+    make_comment,
+    own_address,
+    post,
+    solved_captcha,
+)
 
 COMMENTS = """
 query Comments($page: Int!, $pageSize: Int!, $ordering: CommentOrdering!) {
@@ -241,6 +252,32 @@ def png():
     return buffer.getvalue()
 
 
+class RateLimitTests(TransactionTestCase):
+    async def test_comments_over_the_limit_are_refused_and_keep_the_captcha(self):
+        address = {"X-Real-IP": "198.51.100.1"}
+        with mock.patch.object(ratelimit.comments, "limit", 1):
+            await graphql(CREATE, {"input": form(**solved_captcha())}, address)
+            second = solved_captcha()
+            payload = await graphql(CREATE, {"input": form(**second)}, address)
+        self.assertEqual(error_of(payload)["code"], "RATE_LIMITED")
+        self.assertIn("rateLimit", error_of(payload)["fields"])
+        self.assertEqual(await Comment.objects.acount(), 1)
+        self.assertTrue(captcha.store.check(second["captchaKey"], second["captchaValue"]))
+
+    async def test_captchas_over_the_limit_are_refused_and_aliases_count(self):
+        query = "mutation { a: issueCaptcha { key } b: issueCaptcha { key } }"
+        with mock.patch.object(ratelimit.captchas, "limit", 1):
+            payload = await graphql(query, headers={"X-Real-IP": "198.51.100.2"})
+        self.assertEqual(error_of(payload)["code"], "RATE_LIMITED")
+
+    async def test_another_address_has_its_own_limit(self):
+        query = "mutation { issueCaptcha { key } }"
+        with mock.patch.object(ratelimit.captchas, "limit", 1):
+            await graphql(query, headers={"X-Real-IP": "198.51.100.3"})
+            payload = await graphql(query, headers={"X-Real-IP": "198.51.100.4"})
+        self.assertNotIn("errors", payload)
+
+
 class UploadTests(TransactionTestCase):
     async def send(self, name, content, headers=None):
         """The GraphQL multipart request, as in frontend/src/api.js."""
@@ -252,7 +289,7 @@ class UploadTests(TransactionTestCase):
                 "map": json.dumps({"0": ["variables.attachment"]}),
                 "0": SimpleUploadedFile(name, content),
             },
-            headers=bearer() if headers is None else headers,
+            headers={**own_address(), **(bearer() if headers is None else headers)},
         )
         return json.loads(response.content)
 

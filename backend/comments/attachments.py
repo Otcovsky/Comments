@@ -111,11 +111,17 @@ def _save_still(image, save_format, buffer):
 
 def _save_animated_gif(image, buffer):
     frames, durations = [], []
-    pixels_per_frame = image.width * image.height
+    pixels = 0
     for index, frame in enumerate(ImageSequence.Iterator(image)):
         if index >= MAX_GIF_FRAMES:
             raise AttachmentError(f"В анимации слишком много кадров (максимум {MAX_GIF_FRAMES}).")
-        if (index + 1) * pixels_per_frame > MAX_GIF_PIXELS:
+        # Measured on every frame: one larger than the header says makes Pillow grow the image.
+        # The frame is not decoded yet, so this runs before its pixels are in memory.
+        pixels_per_frame = frame.width * frame.height
+        if pixels_per_frame > MAX_SOURCE_PIXELS:
+            raise AttachmentError("Разрешение изображения слишком большое.")
+        pixels += pixels_per_frame
+        if pixels > MAX_GIF_PIXELS:
             raise AttachmentError("Анимация слишком большая: уменьшите размер или число кадров.")
         frames.append(_fit(frame.convert("RGBA")))
         # Frames may have different delays; keep each one.

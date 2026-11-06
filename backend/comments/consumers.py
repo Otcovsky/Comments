@@ -24,7 +24,7 @@ class CommentsConsumer(AsyncWebsocketConsumer):
             return
         try:
             viewport = parse_viewport(json.loads(text_data))
-        except ValueError:
+        except (ValueError, RecursionError):  # the second one is JSON nested too deep
             return
         if viewport is None:
             return

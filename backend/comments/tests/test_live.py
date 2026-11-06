@@ -152,6 +152,7 @@ class SocketTests(TransactionTestCase):
         await socket.send_to(text_data=json.dumps({"type": "viewport", "page": 0}))
         await socket.send_to(text_data=json.dumps([1, 2]))
         await socket.send_to(text_data="x" * 40000)
+        await socket.send_to(text_data="[" * 30000)  # deep enough for a RecursionError
         await socket.send_to(bytes_data=b"\x00")
         await socket.receive_nothing(QUIET)
         await post()

@@ -2,7 +2,7 @@ from unittest import mock
 
 from django.test import SimpleTestCase, override_settings
 
-from comments import captcha, tokens, validation
+from comments import captcha, ratelimit, tokens, validation
 from comments.errors import ApiError
 from comments.live import Viewers, parse_viewport
 from comments.sanitizer import MessageSanitizer, SanitizeError
@@ -38,9 +38,20 @@ class SanitizerTests(SimpleTestCase):
             '<a href="https://a.io"><a href="https://b.io">x</a></a>',
             "<a>x</a>",
             '<i class="x">x</i>',
+            "hello <world",
+            "<i>x</i> <str",
+            '<a href="https://a.io',
+            "x </",
+            "x <!-- y",
+            "<![foo]>",
         ):
             with self.subTest(text), self.assertRaises(SanitizeError):
                 MessageSanitizer.clean(text)
+
+
+    def test_a_lone_angle_bracket_at_the_end_is_text(self):
+        self.assertEqual(MessageSanitizer.clean("2 <"), "2 &lt;")
+        self.assertEqual(MessageSanitizer.clean("a <1"), "a &lt;1")
 
 
 class ValidationTests(SimpleTestCase):
@@ -81,6 +92,28 @@ class ValidationTests(SimpleTestCase):
         self.assertEqual(validation.parse_id("123"), 123)
         for value in ("", "abc", "-1", " 1", "١٢", "1" * 20, 5, None):
             self.assertIsNone(validation.parse_id(value))
+
+
+class RateLimiterTests(SimpleTestCase):
+    def test_allows_up_to_the_limit(self):
+        limiter = ratelimit.RateLimiter(2)
+        self.assertEqual([limiter.allow("a") for _ in range(3)], [True, True, False])
+        self.assertTrue(limiter.allow("b"))
+
+    def test_a_new_window_starts_over(self):
+        limiter = ratelimit.RateLimiter(1)
+        with mock.patch.object(ratelimit.time, "monotonic", return_value=100):
+            limiter.allow("a")
+            self.assertFalse(limiter.allow("a"))
+        with mock.patch.object(ratelimit.time, "monotonic", return_value=100 + ratelimit.WINDOW_SECONDS):
+            self.assertTrue(limiter.allow("a"))
+
+    def test_keeps_a_bounded_number_of_addresses(self):
+        limiter = ratelimit.RateLimiter(1)
+        with mock.patch.object(ratelimit, "MAX_TRACKED", 2):
+            for address in "abc":
+                limiter.allow(address)
+        self.assertEqual(list(limiter._windows), ["b", "c"])
 
 
 class CaptchaStoreTests(SimpleTestCase):

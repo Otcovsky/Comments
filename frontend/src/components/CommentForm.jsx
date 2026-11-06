@@ -396,7 +396,7 @@ export default function CommentForm({ parentId = null, onSuccess, onCancel }) {
       onSuccess?.(comment);
     } catch (error) {
       const serverErrors =
-        error instanceof ApiError && error.code === "VALIDATION"
+        error instanceof ApiError && (error.code === "VALIDATION" || error.code === "RATE_LIMITED")
           ? mapServerErrors(error.fields)
           : { form: "Не удалось отправить комментарий. Попробуйте ещё раз." };
       // The server asks for a captcha despite the token: it has expired or is no longer valid.

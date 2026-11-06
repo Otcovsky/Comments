@@ -23,6 +23,22 @@ def gif_bytes(frames, size=(40, 30), **options):
     return buffer.getvalue()
 
 
+def gif_frame(size):
+    """A one-frame GIF split into its header with the palette and the frame itself."""
+    buffer = BytesIO()
+    Image.new("L", size, 7).convert("P").save(buffer, format="GIF")
+    content = buffer.getvalue()
+    frame_start = content.index(b"\x2c", 13 + 3 * 2 ** ((content[10] & 7) + 1))
+    return content[:frame_start], content[frame_start:-1]
+
+
+def gif_with_large_second_frame(size):
+    """The header says 1x1 and the second frame is larger, which Pillow accepts."""
+    header, large_frame = gif_frame(size)
+    small_frame = gif_frame((1, 1))[1]
+    return header[:6] + b"\x01\x00\x01\x00" + header[10:] + small_frame + large_frame + b"\x3b"
+
+
 def upload(name, content):
     return SimpleUploadedFile(name, content)
 
@@ -83,6 +99,16 @@ class ImageTests(SimpleTestCase):
     def test_too_many_gif_frames(self):
         with mock.patch.object(attachments, "MAX_GIF_FRAMES", 3), self.assertRaises(AttachmentError):
             process(upload("a.gif", gif_bytes(4)))
+
+    def test_gif_frame_larger_than_its_header_is_too_large(self):
+        content = gif_with_large_second_frame((100, 100))
+        with mock.patch.object(attachments, "MAX_SOURCE_PIXELS", 5_000), self.assertRaises(AttachmentError):
+            process(upload("a.gif", content))
+
+    def test_gif_frame_larger_than_its_header_counts_towards_the_total(self):
+        content = gif_with_large_second_frame((100, 100))
+        with mock.patch.object(attachments, "MAX_GIF_PIXELS", 5_000), self.assertRaises(AttachmentError):
+            process(upload("a.gif", content))
 
     def test_too_many_gif_pixels(self):
         with mock.patch.object(attachments, "MAX_GIF_PIXELS", 40 * 30 * 3), self.assertRaises(AttachmentError):

@@ -11,7 +11,7 @@ from strawberry.extensions import MaskErrors, MaxAliasesLimiter, MaxTokensLimite
 from strawberry.file_uploads import Upload
 from strawberry.types import Info
 
-from . import attachments, captcha, live, queries, storage, tokens, validation
+from . import attachments, captcha, live, queries, ratelimit, storage, tokens, validation
 from .errors import ApiError
 from .models import Comment as CommentModel
 from .pools import in_db_thread, in_file_thread
@@ -102,6 +102,16 @@ class CommentInput:
     captcha_value: str | None = None
 
 
+def _client_address(request):
+    # Nginx sets the header; the backend's port is closed to everyone else.
+    return request.headers.get("X-Real-IP") or request.META.get("REMOTE_ADDR")
+
+
+def _check_rate(limiter, request):
+    if not limiter.allow(_client_address(request)):
+        raise ApiError("RATE_LIMITED", {"rateLimit": "Слишком много запросов. Подождите минуту."})
+
+
 def _check_captcha(input, username, email, authorization):
     """Returns (error for the user or None, whether a captcha was solved in this request)."""
     if input.captcha_key is None:
@@ -157,7 +167,8 @@ class Query:
 @strawberry.type
 class Mutation:
     @strawberry.mutation
-    async def issue_captcha(self) -> Captcha:
+    async def issue_captcha(self, info: Info) -> Captcha:
+        _check_rate(ratelimit.captchas, info.context.request)
         key, image = await captcha.issue()
         return Captcha(key=key, image=image)
 
@@ -166,6 +177,8 @@ class Mutation:
         self, info: Info, input: CommentInput, attachment: Upload | None = None
     ) -> CreateCommentResult:
         request = info.context.request
+        # Before the captcha check, so that a refused request does not spend the captcha.
+        _check_rate(ratelimit.comments, request)
         username, email, home_page = input.username.strip(), input.email.strip(), input.home_page.strip()
         errors = {
             field: message
@@ -208,8 +221,7 @@ class Mutation:
                 text=text,
                 attachment=path,
                 attachment_type=kind,
-                # Nginx sets the header; the backend's port is closed to everyone else.
-                ip_address=request.headers.get("X-Real-IP") or request.META.get("REMOTE_ADDR"),
+                ip_address=_client_address(request),
                 user_agent=request.headers.get("User-Agent", "")[:255],
             )
         )

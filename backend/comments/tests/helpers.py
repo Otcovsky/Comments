@@ -1,3 +1,4 @@
+import itertools
 import json
 
 from django.test import AsyncClient
@@ -18,12 +19,21 @@ mutation Create($input: CommentInput!, $attachment: Upload) {
 """
 
 
+_addresses = itertools.count(1)
+
+
+def own_address():
+    """A new client address, so that the tests stay under the limits per IP."""
+    number = next(_addresses)
+    return {"X-Real-IP": f"10.0.{number // 256}.{number % 256}"}
+
+
 async def graphql(query, variables=None, headers=None):
     response = await AsyncClient().post(
         "/graphql/",
         data=json.dumps({"query": query, "variables": variables or {}}),
         content_type="application/json",
-        headers=headers,
+        headers={**own_address(), **(headers or {})},
     )
     return json.loads(response.content)
 
