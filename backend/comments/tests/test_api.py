@@ -107,15 +107,15 @@ class ListTests(TransactionTestCase):
         self.assertIsNone(rows[1]["attachment"])
         self.assertIsNone(rows[1]["attachmentType"])
 
-    async def test_replies_are_direct_and_oldest_first(self):
+    async def test_replies_are_direct_and_newest_first(self):
         root = await sync_to_async(make_comment)(self.ann)
         first = await sync_to_async(make_comment)(self.bob, root)
         second = await sync_to_async(make_comment)(self.bob, root)
         deep = await sync_to_async(make_comment)(self.bob, first)
         rows = (await graphql(REPLIES, {"parentId": str(root.id)}))["data"]["replies"]
-        self.assertEqual([row["id"] for row in rows], [str(first.id), str(second.id)])
-        self.assertEqual(rows[0]["replyCount"], 1)
-        self.assertEqual(rows[0]["rootId"], str(root.id))
+        self.assertEqual([row["id"] for row in rows], [str(second.id), str(first.id)])
+        self.assertEqual(rows[1]["replyCount"], 1)
+        self.assertEqual(rows[1]["rootId"], str(root.id))
         rows = (await graphql(REPLIES, {"parentId": str(first.id)}))["data"]["replies"]
         self.assertEqual(rows[0]["id"], str(deep.id))
         self.assertEqual(rows[0]["rootId"], str(root.id))

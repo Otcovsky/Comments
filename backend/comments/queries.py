@@ -59,7 +59,7 @@ def comment_page(page, page_size, ordering):
 
 
 def replies(parent_id):
-    rows = _with_reply_count(Comment.objects.filter(parent_id=parent_id)).order_by("created_at", "id")
+    rows = _with_reply_count(Comment.objects.filter(parent_id=parent_id)).order_by("-created_at", "-id")
     return list(rows.values(*ROW_FIELDS))
 
 
