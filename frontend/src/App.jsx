@@ -12,6 +12,9 @@ const PAGE_SIZES = [10, 25, 50]; // The sizes offered here; the server's limit i
 const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZE_KEY = "comments.pageSize";
 const DEFAULT_ORDERING = "-created_at"; // LIFO
+// Everyone on a page hears about a new comment at once: a random delay spreads their
+// reloads out, and the comments that arrive during it share one reload.
+const LIVE_RELOAD_MAX_DELAY_MS = 1000;
 
 function loadPageSize() {
   try {
@@ -75,12 +78,16 @@ export default function App() {
   // A reload of the rows on screen failed; they are kept, but may be out of date.
   const [stale, setStale] = useState(false);
   const requestId = useRef(0);
+  const liveReload = useRef(null);
   // The page, its size and the ordering of the rows on screen.
   const shownQuery = useRef(null);
   const expandedRef = useRef(thread.rootId);
   expandedRef.current = thread.rootId;
 
   const load = useCallback(() => {
+    // This request reads everything committed so far, so a waiting live reload adds nothing.
+    clearTimeout(liveReload.current);
+    liveReload.current = null;
     // Only the latest request may update the table (fast sort clicks, live updates).
     const current = ++requestId.current;
     const query = `${page} ${pageSize} ${ordering}`;
@@ -107,6 +114,11 @@ export default function App() {
 
   useEffect(load, [load]);
 
+  const reloadSoon = () => {
+    if (liveReload.current !== null) return;
+    liveReload.current = setTimeout(load, Math.random() * LIVE_RELOAD_MAX_DELAY_MS);
+  };
+
   const viewport = useMemo(
     () => ({
       type: "viewport",
@@ -123,7 +135,7 @@ export default function App() {
     viewport,
     (event) => {
       if (event.type === "comment.created") {
-        if (event.parentId === null) load();
+        if (event.parentId === null) reloadSoon();
         else thread.reloadBranch(event.parentId);
       }
       if (event.type === "comment.replyCount") {
