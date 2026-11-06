@@ -18,6 +18,32 @@ const pageButton = cx(
   focusRing,
 );
 
+export function PageSizePicker({ sizes, value, onChange }) {
+  return (
+    <div className="flex items-center gap-1" role="group" aria-label="Комментариев на странице">
+      <span className="mr-1 text-sm text-muted" aria-hidden="true">
+        На странице:
+      </span>
+      {sizes.map((size) => (
+        <button
+          type="button"
+          key={size}
+          className={cx(
+            pageButton,
+            size === value
+              ? "bg-accent-soft text-accent-ink"
+              : "text-muted hover:bg-surface hover:text-fg hover:shadow-xs",
+          )}
+          aria-pressed={size === value}
+          onClick={() => onChange(size)}
+        >
+          {size}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function Pagination({ page, totalPages, onChange }) {
   if (totalPages <= 1) return null;
   return (

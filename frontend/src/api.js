@@ -65,15 +65,15 @@ const CREATE_COMMENT = `
 `;
 
 export const api = {
-  listComments: async ({ page, ordering }) => {
+  listComments: async ({ page, pageSize, ordering }) => {
     const data = await request(
-      `query Comments($page: Int!, $ordering: CommentOrdering!) {
-        comments(page: $page, ordering: $ordering) {
+      `query Comments($page: Int!, $pageSize: Int!, $ordering: CommentOrdering!) {
+        comments(page: $page, pageSize: $pageSize, ordering: $ordering) {
           count
           results { ${COMMENT_FIELDS} }
         }
       }`,
-      { page, ordering: orderingEnum(ordering) },
+      { page, pageSize, ordering: orderingEnum(ordering) },
     );
     return data.comments;
   },

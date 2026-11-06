@@ -3,13 +3,32 @@ import { MessageSquareDashed, MessagesSquare, PenLine, RotateCw, TriangleAlert, 
 import { api, ApiError, orderingEnum } from "./api.js";
 import CommentForm from "./components/CommentForm.jsx";
 import CommentsTable, { TableSkeleton } from "./components/CommentsTable.jsx";
-import Pagination from "./components/Pagination.jsx";
+import Pagination, { PageSizePicker } from "./components/Pagination.jsx";
 import { Button, cx, EmptyState } from "./components/ui.jsx";
 import { useCommentsSocket } from "./socket.js";
 import { useThread } from "./thread.js";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZES = [10, 25, 50]; // The sizes offered here; the server's limit is in docs/api.md.
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_KEY = "comments.pageSize";
 const DEFAULT_ORDERING = "-created_at"; // LIFO
+
+function loadPageSize() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PAGE_SIZE_KEY));
+    return PAGE_SIZES.includes(saved) ? saved : DEFAULT_PAGE_SIZE;
+  } catch {
+    return DEFAULT_PAGE_SIZE;
+  }
+}
+
+function savePageSize(size) {
+  try {
+    localStorage.setItem(PAGE_SIZE_KEY, JSON.stringify(size));
+  } catch {
+    // Storage may be unavailable (private mode); the size just resets on reload.
+  }
+}
 
 function plural(count, [one, few, many]) {
   const mod10 = count % 10;
@@ -47,6 +66,7 @@ function LiveStatus({ connected }) {
 
 export default function App() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(loadPageSize);
   const [ordering, setOrdering] = useState(DEFAULT_ORDERING);
   const [data, setData] = useState({ count: 0, results: [] });
   const [status, setStatus] = useState("loading");
@@ -55,7 +75,7 @@ export default function App() {
   // A reload of the rows on screen failed; they are kept, but may be out of date.
   const [stale, setStale] = useState(false);
   const requestId = useRef(0);
-  // The page and ordering of the rows on screen.
+  // The page, its size and the ordering of the rows on screen.
   const shownQuery = useRef(null);
   const expandedRef = useRef(thread.rootId);
   expandedRef.current = thread.rootId;
@@ -63,9 +83,9 @@ export default function App() {
   const load = useCallback(() => {
     // Only the latest request may update the table (fast sort clicks, live updates).
     const current = ++requestId.current;
-    const query = `${page} ${ordering}`;
+    const query = `${page} ${pageSize} ${ordering}`;
     api
-      .listComments({ page, ordering })
+      .listComments({ page, pageSize, ordering })
       .then((result) => {
         if (current !== requestId.current) return;
         const same = shownQuery.current === query;
@@ -83,7 +103,7 @@ export default function App() {
         else if (shownQuery.current === query) setStale(true);
         else setStatus("error");
       });
-  }, [page, ordering]);
+  }, [page, pageSize, ordering]);
 
   useEffect(load, [load]);
 
@@ -91,11 +111,12 @@ export default function App() {
     () => ({
       type: "viewport",
       page,
+      pageSize,
       ordering: orderingEnum(ordering),
       thread: thread.rootId,
       branches: thread.branches,
     }),
-    [page, ordering, thread.rootId, thread.branches],
+    [page, pageSize, ordering, thread.rootId, thread.branches],
   );
 
   const connected = useCommentsSocket(
@@ -136,6 +157,13 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const changePageSize = (next) => {
+    setPageSize(next);
+    savePageSize(next);
+    setPage(1);
+    thread.close();
+  };
+
   const openForm = () => {
     setFormOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -151,7 +179,7 @@ export default function App() {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(data.count / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(data.count / pageSize));
 
   return (
     <div className="min-h-screen">
@@ -249,7 +277,13 @@ export default function App() {
           )}
         </section>
 
-        <Pagination page={page} totalPages={totalPages} onChange={changePage} />
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+          <Pagination page={page} totalPages={totalPages} onChange={changePage} />
+          {/* Stays when everything fits on one page, so a larger size can be undone. */}
+          {data.count > PAGE_SIZES[0] && (
+            <PageSizePicker sizes={PAGE_SIZES} value={pageSize} onChange={changePageSize} />
+          )}
+        </div>
       </main>
     </div>
   );
