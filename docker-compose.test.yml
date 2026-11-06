@@ -1,0 +1,31 @@
+# The tests create their own database, which the cloud user has no right to do, so they get
+# a throwaway MySQL. Run from the repository root:
+#   docker compose -f docker-compose.test.yml run --rm --build tests
+name: comments-test
+
+services:
+  test-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: test
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-ptest"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  tests:
+    build: ./backend
+    command: python manage.py test --noinput
+    environment:
+      DJANGO_SECRET_KEY: test
+      DB_HOST: test-db
+      DB_PORT: "3306"
+      DB_NAME: comments
+      DB_USER: root
+      DB_PASSWORD: test
+    depends_on:
+      test-db:
+        condition: service_healthy

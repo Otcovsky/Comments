@@ -1,19 +1,21 @@
 -- Database schema of the Comments app (application tables only).
 -- Matches what the Django migrations create in MySQL. To open in MySQL Workbench:
 -- File -> Import -> Reverse Engineer MySQL Create Script... -> select this file.
+-- Foreign keys have no ON DELETE action: Django removes dependent rows itself.
+-- Captchas live in the memory of the backend process, so they have no table.
 
-CREATE SCHEMA IF NOT EXISTS `comments` DEFAULT CHARACTER SET utf8mb4;
+CREATE SCHEMA IF NOT EXISTS `comments` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `comments`;
 
 CREATE TABLE `comments_author` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `username` VARCHAR(64) NOT NULL,
   `email` VARCHAR(254) NOT NULL,
-  `home_page` VARCHAR(200) NOT NULL DEFAULT '',
+  `home_page` VARCHAR(200) NOT NULL COMMENT 'From the first comment of the author; empty if not given',
   `created_at` DATETIME(6) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_author` (`username`, `email`),
-  KEY `comments_au_email_idx` (`email`)
+  KEY `comments_au_email_56fa4a_idx` (`email`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE `comments_comment` (
@@ -22,26 +24,17 @@ CREATE TABLE `comments_comment` (
   `parent_id` BIGINT NULL COMMENT 'Comment this one replies to; NULL for top-level comments',
   `root_id` BIGINT NULL COMMENT 'Top-level comment of the thread; NULL for top-level comments',
   `text` LONGTEXT NOT NULL COMMENT 'Sanitized XHTML: only a, code, i, strong',
-  `attachment` VARCHAR(100) NOT NULL DEFAULT '',
-  `attachment_type` VARCHAR(10) NOT NULL DEFAULT '' COMMENT '"", image, text',
-  `attachment_status` VARCHAR(10) NOT NULL DEFAULT 'ready' COMMENT 'ready, pending (image waits for the worker), failed',
+  `attachment` VARCHAR(100) NOT NULL COMMENT 'Object key in the bucket; empty if there is no file',
+  `attachment_type` VARCHAR(10) NOT NULL COMMENT '"", image, text',
   `ip_address` CHAR(39) NULL,
-  `user_agent` VARCHAR(255) NOT NULL DEFAULT '',
+  `user_agent` VARCHAR(255) NOT NULL,
   `created_at` DATETIME(6) NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `comments_comment_created_at_idx` (`created_at`),
-  KEY `comments_co_parent_created_idx` (`parent_id`, `created_at` DESC),
-  KEY `comments_co_root_created_idx` (`root_id`, `created_at`),
-  KEY `comments_co_status_created_idx` (`attachment_status`, `created_at`),
-  CONSTRAINT `fk_comment_author` FOREIGN KEY (`author_id`) REFERENCES `comments_author` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_comment_parent` FOREIGN KEY (`parent_id`) REFERENCES `comments_comment` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_comment_root` FOREIGN KEY (`root_id`) REFERENCES `comments_comment` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-CREATE TABLE `comments_captcha` (
-  `key` CHAR(32) NOT NULL,
-  `answer` VARCHAR(16) NOT NULL,
-  `created_at` DATETIME(6) NOT NULL,
-  PRIMARY KEY (`key`),
-  KEY `comments_captcha_created_at_idx` (`created_at`)
+  KEY `comments_comment_author_id_334ce9e2_fk_comments_author_id` (`author_id`),
+  KEY `comments_comment_created_at_c684ddb5` (`created_at`),
+  KEY `comments_co_parent__2efacb_idx` (`parent_id`, `created_at` DESC),
+  KEY `comments_co_root_id_45b474_idx` (`root_id`, `created_at`),
+  CONSTRAINT `comments_comment_author_id_334ce9e2_fk_comments_author_id` FOREIGN KEY (`author_id`) REFERENCES `comments_author` (`id`),
+  CONSTRAINT `comments_comment_parent_id_3e0802fb_fk_comments_comment_id` FOREIGN KEY (`parent_id`) REFERENCES `comments_comment` (`id`),
+  CONSTRAINT `comments_comment_root_id_23b4c218_fk_comments_comment_id` FOREIGN KEY (`root_id`) REFERENCES `comments_comment` (`id`)
 ) ENGINE=InnoDB;

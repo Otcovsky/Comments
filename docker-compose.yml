@@ -1,0 +1,17 @@
+# Run from the repository root; settings come from the env file next to it:
+#   docker compose --env-file ../comments.env up -d --build
+services:
+  backend:
+    build: ./backend
+    env_file: ../comments.env
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      MEDIA_BUCKET_URL: ${S3_ENDPOINT}/${S3_BUCKET}
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
