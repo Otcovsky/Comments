@@ -214,17 +214,16 @@ class Mutation:
         path, kind = await _save_attachment(attachment) if attachment else ("", CommentModel.AttachmentType.NONE)
 
         row = await in_db_thread(
-            lambda: queries.save_comment(
-                username=username,
-                email=email,
-                home_page=home_page,
-                parent=parent,
-                text=text,
-                attachment=path,
-                attachment_type=kind,
-                ip_address=_client_address(request),
-                user_agent=request.headers.get("User-Agent", "")[:255],
-            )
+            queries.save_comment,
+            username=username,
+            email=email,
+            home_page=home_page,
+            parent=parent,
+            text=text,
+            attachment=path,
+            attachment_type=kind,
+            ip_address=_client_address(request),
+            user_agent=request.headers.get("User-Agent", "")[:255],
         )
         live.comment_created_later(row, parent)
 

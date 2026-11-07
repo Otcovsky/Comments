@@ -44,6 +44,9 @@ TIME_ZONE = "UTC"
 # Threads of comments/pools.py. DB threads hold one connection each; file threads decode images.
 DB_THREADS = 8
 FILE_THREADS = 2
+# Load tests only: every this many seconds the log gets how long calls waited for a DB thread
+# and how long they ran (comments.pools.PoolStats). 0 turns it off.
+DB_POOL_REPORT = int(os.environ.get("DB_POOL_REPORT", "0"))
 
 # Seconds a token from a solved captcha replaces the next captchas.
 AUTHOR_TOKEN_TTL = 3600

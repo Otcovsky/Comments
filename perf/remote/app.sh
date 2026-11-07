@@ -1,6 +1,6 @@
 #!/bin/sh
 # Runs on the app server; perf/run.sh copies it there and calls it over ssh.
-# Usage: APP_DIR=~/comments app.sh check|info|reset|stats-start|stats-stop|db-status|foreign
+# Usage: APP_DIR=~/comments app.sh check|info|reset|stats-start|stats-stop|db-status|db-pool|foreign
 set -eu
 
 cd "$APP_DIR"
@@ -127,6 +127,10 @@ foreign)
     compose logs --no-log-prefix --since "$2" frontend 2>/dev/null \
         | awk '$1 ~ /^[0-9.]+$/ && $1 !~ /^(10|127)\./ && $1 !~ /^172\.(1[6-9]|2[0-9]|3[01])\./ && $1 !~ /^192\.168\./ {print $1}' \
         | sort | uniq -c | sort -rn | awk '{total += $1; detail = detail " " $2 "=" $1} END {print total + 0 detail}'
+    ;;
+db-pool)
+    # What the backend logged about its DB threads since unix time $2 (DB_POOL_REPORT).
+    compose logs --no-log-prefix --since "$2" backend 2>/dev/null | grep 'db pool:' || true
     ;;
 db-status)
     # Through the app's own connection: works for the local container and a cloud database.

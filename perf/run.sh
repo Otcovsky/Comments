@@ -103,6 +103,7 @@ run_once() {
     app stats-stop
     app db-status > "$dir/mysql_after.tsv"
     app foreign "$started" > "$dir/foreign.txt"
+    app db-pool "$started" > "$dir/db_pool.txt"
     # A few hits from internet scanners are normal; an open tab makes hundreds.
     if [ "$(cut -d' ' -f1 "$dir/foreign.txt")" -gt 10 ]; then
         echo "WARNING: requests from outside the load machine during the run (count, ip=count):" >&2

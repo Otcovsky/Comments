@@ -3,7 +3,7 @@ from unittest import mock
 
 from django.test import SimpleTestCase, override_settings
 
-from comments import captcha, ratelimit, tokens, validation
+from comments import captcha, pools, ratelimit, tokens, validation
 from comments.errors import ApiError
 from comments.live import Viewers, parse_viewport
 from comments.sanitizer import MessageSanitizer, SanitizeError
@@ -123,6 +123,23 @@ class RateLimiterTests(SimpleTestCase):
             self.assertFalse(ratelimit.is_exempt("not an address"))
             self.assertFalse(ratelimit.is_exempt(None))
         self.assertFalse(ratelimit.is_exempt("10.0.0.7"))
+
+
+@override_settings(DB_THREADS=8)
+class PoolStatsTests(SimpleTestCase):
+    def test_reports_waits_and_runs_by_function_once(self):
+        stats = pools.PoolStats()
+        for _ in range(3):
+            stats.submitted()
+        for wait, run in ((0.001, 0.010), (0.003, 0.020)):
+            stats.started()
+            stats.finished("comment_page", wait, run)
+        stats.started()
+        stats.finished("positions", 0.050, 0.070)
+        line = stats.report()
+        self.assertTrue(line.startswith("db pool: busy max 1/8, queued max 3; positions n=1 "), line)
+        self.assertIn("comment_page n=2 wait p50/p95/max 3.0/3.0/3.0 ms run p50/p95 20.0/20.0 ms", line)
+        self.assertIsNone(stats.report())
 
 
 class CaptchaStoreTests(SimpleTestCase):
