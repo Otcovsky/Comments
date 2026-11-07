@@ -3,6 +3,7 @@ from functools import cache
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 from django.conf import settings
 from django.utils import timezone
 
@@ -33,6 +34,16 @@ def put(file, key=None):
     key = key or f"attachments/{timezone.now():%Y/%m}/{uuid.uuid4().hex}.{file.extension}"
     _client().put_object(Bucket=settings.S3_BUCKET, Key=key, Body=file.content, ContentType=file.content_type)
     return key
+
+
+def exists(key):
+    try:
+        _client().head_object(Bucket=settings.S3_BUCKET, Key=key)
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+            return False
+        raise
+    return True
 
 
 def delete(key):

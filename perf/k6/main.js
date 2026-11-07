@@ -17,7 +17,8 @@ import { setTimeout } from "k6/timers";
 import { summarize } from "./lib/summary.js";
 
 // 2: GraphQL API, threads unfolded level by level, a WebSocket viewport per tab.
-export const SUITE_VERSION = 2;
+// 3: the same behaviour in shorter runs, and one reset for all steps (suite.env).
+export const SUITE_VERSION = 3;
 
 const env = (name, fallback) => __ENV[name] || fallback;
 

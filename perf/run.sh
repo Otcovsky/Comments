@@ -7,7 +7,7 @@
 #   perf/run.sh load  <label> [rate]           # fixed rate, 5 minutes
 #   perf/run.sh soak  <label> [rate]           # fixed rate, 30 minutes
 #   perf/run.sh upload <label> [rate]          # only uploads with attachments, 3 minutes
-#   perf/run.sh step  <label> [rate...]        # 60 s per rate until the SLO breaks
+#   perf/run.sh step  <label> [rate...]        # STEP_DURATION per rate until the SLO breaks
 #
 # Outside the suite, k6 variables can be overridden from the environment, e.g. DURATION=2m.
 set -euo pipefail
@@ -74,14 +74,17 @@ EOF
 stop_stats() { app stats-stop > /dev/null 2>&1 || true; }
 trap stop_stats EXIT
 
-# One k6 run into $1 at rate $2 with profile $3. Sets K6_CODE (0 = passed, 99 = SLO broken).
+# One k6 run into $1 at rate $2 with profile $3; $4 = 0 keeps the data of the previous run.
+# Sets K6_CODE (0 = passed, 99 = SLO broken).
 # Never called from a condition: bash would silently turn off `set -e` inside it.
 run_once() {
-    local dir=$1 rate=$2 profile=$3 code=0
+    local dir=$1 rate=$2 profile=$3 reset=${4:-1} code=0
     mkdir -p "$dir"
     echo "== $profile at $rate it/s -> ${dir#"$HERE"/}"
-    # shellcheck disable=SC2086
-    app reset $SEED_ARGS | tail -1
+    if [ "$reset" = 1 ]; then
+        # shellcheck disable=SC2086
+        app reset $SEED_ARGS | tail -1
+    fi
     app db-status > "$dir/mysql_before.tsv"
     app stats-start
     local started
@@ -119,14 +122,15 @@ run_once() {
     K6_CODE=$code
 }
 
-# Rates in order, one minute each, until the SLO breaks.
+# Rates in order, STEP_DURATION each, until the SLO breaks. The data is reset before the first.
 run_steps() {
-    local dir=$1
+    local dir=$1 reset=1
     shift
-    local DURATION=${DURATION:-60s} WARMUP=${WARMUP:-15s} VIEWERS=${VIEWERS:-$STEP_VIEWERS}
+    local DURATION=${DURATION:-$STEP_DURATION} WARMUP=${WARMUP:-$STEP_WARMUP} VIEWERS=${VIEWERS:-$STEP_VIEWERS}
     export DURATION WARMUP VIEWERS
     for rate in "$@"; do
-        run_once "$dir/rate-$(printf %03d "$rate")" "$rate" load
+        run_once "$dir/rate-$(printf %03d "$rate")" "$rate" load "$reset"
+        reset=0
         if [ "$K6_CODE" != 0 ]; then
             echo "SLO broken at $rate it/s, stopping"
             break
@@ -139,9 +143,9 @@ prepare
 case "$MODE" in
 suite)
     # Two load runs show the spread between identical runs.
-    VIEWERS=$LOAD_VIEWERS run_once "$RUN_DIR/load-a" "$LOAD_RATE" load
-    VIEWERS=$LOAD_VIEWERS run_once "$RUN_DIR/load-b" "$LOAD_RATE" load
-    run_once "$RUN_DIR/upload" "$UPLOAD_RATE" upload
+    DURATION=$LOAD_DURATION WARMUP=$LOAD_WARMUP VIEWERS=$LOAD_VIEWERS run_once "$RUN_DIR/load-a" "$LOAD_RATE" load
+    DURATION=$LOAD_DURATION WARMUP=$LOAD_WARMUP VIEWERS=$LOAD_VIEWERS run_once "$RUN_DIR/load-b" "$LOAD_RATE" load
+    DURATION=$UPLOAD_DURATION WARMUP=$UPLOAD_WARMUP run_once "$RUN_DIR/upload" "$UPLOAD_RATE" upload
     # shellcheck disable=SC2086
     run_steps "$RUN_DIR/step" $STEP_RATES
     ;;

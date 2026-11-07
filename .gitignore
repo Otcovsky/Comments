@@ -9,6 +9,8 @@ dist/
 .env
 .env.*
 *.env
+# The fixed load test suite: settings, not secrets.
+!perf/suite.env
 *.key
 *.pem
 .claude/

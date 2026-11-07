@@ -32,7 +32,7 @@ START = datetime(2025, 1, 1, tzinfo=timezone.utc)
 SPAN = timedelta(days=365)
 # Attachments come from a pool of files shared by many comments, so seeding stays fast.
 # Kinds and shares match the k6 upload mix; images are already in their stored 320x240 form.
-# The pool keeps the same keys in the bucket, and every seed writes the same bytes over them.
+# The pool keeps the same keys in the bucket and is uploaded once per seed.
 POOL_PREFIX = "perf-seed/"
 POOL = {"jpg": 180, "gif": 75, "txt": 45}
 CONTENT_TYPES = {"jpg": "image/jpeg", "gif": "image/gif", "txt": "text/plain; charset=utf-8"}
@@ -84,7 +84,7 @@ class Command(BaseCommand):
 
         rng = random.Random(seed)
         self.wipe()
-        pool = self.make_pool(rng) if attachments else {}
+        pool = self.make_pool(rng, seed) if attachments else {}
         with transaction.atomic(), explicit_created_at():
             Author.objects.bulk_create(self.make_authors(rng, authors), batch_size=2000)
             comments = self.make_comments(rng, top, replies, authors)
@@ -104,7 +104,7 @@ class Command(BaseCommand):
         )
 
     def wipe(self):
-        # Files uploaded during earlier runs; the pool is written over by make_pool.
+        # Files uploaded during earlier runs; the pool stays for the next seed.
         uploaded = (
             Comment.objects.exclude(attachment="")
             .exclude(attachment__startswith=POOL_PREFIX)
@@ -129,20 +129,25 @@ class Command(BaseCommand):
             cursor.execute(f"ANALYZE TABLE {tables}")
             cursor.fetchall()
 
-    def make_pool(self, rng):
+    def make_pool(self, rng, seed):
         # The files are generated in order, so the seed decides their bytes; only the uploads
-        # run in parallel.
+        # run in parallel. They are generated even when the bucket has them, so that the rest
+        # of the data set gets the same random numbers.
         files = [
             (kind, f"{POOL_PREFIX}{kind}-{index:03d}.{kind}", self.file(rng, kind))
             for kind, count in POOL.items()
             for index in range(count)
         ]
-        in_parallel(
-            lambda item: storage.put(
-                ProcessedFile(item[2], item[0], CONTENT_TYPES[item[0]], self.kind(item[0])), key=item[1]
-            ),
-            files,
-        )
+        # Written last, so it is there only when the whole pool of this seed is.
+        done = f"{POOL_PREFIX}seed-{seed}.done"
+        if not storage.exists(done):
+            in_parallel(
+                lambda item: storage.put(
+                    ProcessedFile(item[2], item[0], CONTENT_TYPES[item[0]], self.kind(item[0])), key=item[1]
+                ),
+                files,
+            )
+            storage.put(ProcessedFile(b"", "done", "text/plain", ""), key=done)
         pool = {}
         for kind, key, _ in files:
             pool.setdefault(kind, []).append(key)
