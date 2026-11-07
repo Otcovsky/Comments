@@ -36,8 +36,10 @@ export function summarize(data, meta) {
   }
   endpoints.media = ms("http_req_duration{phase:media}");
   const failed = {};
+  const dropped = {};
   for (const name of Object.keys(meta.mix)) {
     failed[name] = value(m[`http_req_failed{scenario:${name}}`], "rate");
+    dropped[name] = value(m[`dropped_iterations{scenario:${name}}`], "count") || 0;
   }
   const thresholds = {};
   for (const [name, metric] of Object.entries(m)) {
@@ -68,6 +70,7 @@ export function summarize(data, meta) {
     },
     endpoints,
     failed_by_scenario: failed,
+    dropped_by_scenario: dropped,
     ws: {
       delivery: ms("ws_delivery_ms"),
       messages: value(m.ws_messages, "count") || 0,

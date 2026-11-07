@@ -17,7 +17,8 @@ import { setTimeout } from "k6/timers";
 import { summarize } from "./lib/summary.js";
 
 // 2: GraphQL API, threads unfolded level by level, a WebSocket viewport per tab.
-// 3: the same behaviour in shorter runs, and one reset for all steps (suite.env).
+// 3: the same behaviour in shorter runs, one reset for all steps (suite.env), and VUs
+// created before the run.
 export const SUITE_VERSION = 3;
 
 const env = (name, fallback) => __ENV[name] || fallback;
@@ -130,7 +131,9 @@ function seconds(value) {
 function arrival(fn, share) {
   // Per minute, so small shares still get at least one iteration.
   const perMinute = Math.max(1, Math.round(RATE * share * 60));
-  const vus = Math.ceil((perMinute / 60) * 2) + 2;
+  // VUs for iterations up to 4 s, created before the run: a VU created mid-run takes a
+  // while, its iteration is dropped meanwhile, and the drop would fail a healthy server.
+  const vus = Math.ceil((perMinute / 60) * 4) + 4;
   return {
     executor: "constant-arrival-rate",
     exec: fn,
@@ -139,7 +142,7 @@ function arrival(fn, share) {
     duration: DURATION,
     startTime: WARMUP,
     preAllocatedVUs: vus,
-    maxVUs: Math.max(vus * 10, 50),
+    maxVUs: Math.max(vus * 5, 50),
     tags: { phase: "main" },
   };
 }
@@ -190,6 +193,7 @@ if (MIX.attach) thresholds.attach_ready = ["rate>0.99"];
 for (const name of Object.keys(MIX)) {
   thresholds[`http_req_duration{scenario:${name}}`] = ["max>=0"];
   thresholds[`http_req_failed{scenario:${name}}`] = ["rate>=0"];
+  thresholds[`dropped_iterations{scenario:${name}}`] = ["count>=0"];
 }
 // Per operation, main phase only (warmup requests have the same names).
 for (const name of ["list", "thread", "branch", "captcha", "create", "preview", "attach"]) {
