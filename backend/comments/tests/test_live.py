@@ -1,12 +1,13 @@
 """The table of examples from docs/api.md, section 6, and the rest of the socket's rules."""
 import json
+from unittest import mock
 
 from channels.exceptions import ChannelFull
 from channels.layers import get_channel_layer
 from channels.testing import WebsocketCommunicator
 from django.test import TransactionTestCase, override_settings
 
-from comments import live
+from comments import live, queries
 from comments.live import viewers
 from comments.routing import websocket_urlpatterns
 
@@ -55,6 +56,17 @@ class SocketTests(TransactionTestCase):
             await socket.receive_json_from(),
             {"type": "comment.created", "id": comment["id"], "parentId": None, "rootId": None},
         )
+        await self.close()
+
+    async def test_new_comment_by_date_needs_no_position_count(self):
+        for _ in range(3):
+            await post()
+        newest = await self.connect()
+        last_page = await self.connect(page=2, page_size=2, ordering="CREATED_AT_ASC")
+        with mock.patch.object(queries, "positions", side_effect=AssertionError("counted")):
+            comment = await post()
+        for socket in (newest, last_page):
+            self.assertEqual((await socket.receive_json_from())["id"], comment["id"])
         await self.close()
 
     async def test_third_page_hears_nothing(self):

@@ -3,7 +3,7 @@ import json
 
 from django.test import AsyncClient
 
-from comments import captcha, tokens
+from comments import captcha, live, tokens
 from comments.models import Author, Comment
 
 CREATE = """
@@ -35,6 +35,8 @@ async def graphql(query, variables=None, headers=None):
         content_type="application/json",
         headers={**own_address(), **(headers or {})},
     )
+    # The events go out after the response; a test sees the state once they are sent.
+    await live.finish_dispatching()
     return json.loads(response.content)
 
 

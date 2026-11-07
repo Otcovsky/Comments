@@ -226,7 +226,7 @@ class Mutation:
                 user_agent=request.headers.get("User-Agent", "")[:255],
             )
         )
-        await live.comment_created(row, parent)
+        live.comment_created_later(row, parent)
 
         return CreateCommentResult(
             comment=Comment.from_row(row),

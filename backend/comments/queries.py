@@ -1,4 +1,6 @@
 """Database access. Everything here blocks, so callers go through pools.in_db_thread."""
+import threading
+
 from django.db.models import Count, IntegerField, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 
@@ -33,6 +35,38 @@ def _top_level():
     return Comment.objects.filter(parent__isnull=True)
 
 
+class TopLevelCount:
+    """The number of top-level comments. Every page of the list needs it, and counting 10,000
+    index entries costs about as much as the page itself, so it is counted once and forgotten
+    when a top-level comment is saved or any comment deleted (signals in apps.py). The DB
+    threads share it, hence the lock."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._value = None
+        # Moves on with every forget, so a count that started before it is not kept.
+        self._generation = 0
+
+    def get(self):
+        with self._lock:
+            if self._value is not None:
+                return self._value
+            generation = self._generation
+        value = _top_level().count()
+        with self._lock:
+            if generation == self._generation:
+                self._value = value
+        return value
+
+    def forget(self, **kwargs):
+        with self._lock:
+            self._value = None
+            self._generation += 1
+
+
+top_level_count = TopLevelCount()
+
+
 def _with_reply_count(comments):
     # A subquery, because a JOIN with GROUP BY joins every reply to every comment before LIMIT:
     # that one query once cost 95% of the p95 latency.
@@ -44,7 +78,7 @@ def _with_reply_count(comments):
 
 def comment_page(page, page_size, ordering):
     """Returns (count of top-level comments, rows of the page). Past the end there are no rows."""
-    count = _top_level().count()
+    count = top_level_count.get()
     offset = (page - 1) * page_size
     if offset >= count:
         return count, []

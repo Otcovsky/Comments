@@ -10,7 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import AsyncClient, TransactionTestCase, override_settings
 from PIL import Image
 
-from comments import captcha, queries, ratelimit
+from comments import captcha, live, queries, ratelimit
 from comments.models import Author, Comment
 
 from .helpers import (
@@ -300,6 +300,7 @@ class UploadTests(TransactionTestCase):
             },
             headers={**own_address(), **(bearer() if headers is None else headers)},
         )
+        await live.finish_dispatching()
         return json.loads(response.content)
 
     def bucket(self, **options):
@@ -342,6 +343,37 @@ class UploadTests(TransactionTestCase):
             payload = await self.send("a.txt", b"hello", {})
         self.assertIn("captchaValue", error_of(payload)["fields"])
         client.return_value.put_object.assert_not_called()
+
+
+class TopLevelCountTests(TransactionTestCase):
+    def test_counted_once_until_a_top_level_comment_is_saved(self):
+        author = make_author()
+        root = make_comment(author)
+        with self.assertNumQueries(1):
+            self.assertEqual(queries.top_level_count.get(), 1)
+            self.assertEqual(queries.top_level_count.get(), 1)
+        make_comment(author, parent=root)
+        with self.assertNumQueries(0):
+            self.assertEqual(queries.top_level_count.get(), 1)
+        make_comment(author)
+        self.assertEqual(queries.top_level_count.get(), 2)
+        root.delete()
+        self.assertEqual(queries.top_level_count.get(), 1)
+
+    def test_a_count_older_than_a_new_comment_is_not_kept(self):
+        author = make_author()
+        make_comment(author)
+        queries.top_level_count.forget()
+        real_count = queries._top_level
+
+        def count_while_another_comment_is_saved():
+            counted = real_count()
+            make_comment(author)
+            return mock.Mock(count=lambda: counted.count() - 1)
+
+        with mock.patch.object(queries, "_top_level", count_while_another_comment_is_saved):
+            self.assertEqual(queries.top_level_count.get(), 1)
+        self.assertEqual(queries.top_level_count.get(), 2)
 
 
 class PositionTests(TransactionTestCase):

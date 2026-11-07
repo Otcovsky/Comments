@@ -3,6 +3,7 @@
 Only the event loop touches `viewers`, so it needs no locks. It lives in process memory:
 after a restart clients reconnect and report their zone again.
 """
+import asyncio
 import logging
 from collections import defaultdict
 
@@ -88,12 +89,24 @@ def parse_viewport(message):
     return ordering, page_size, page, ids
 
 
-async def _send_to_page(comment_id, payload):
-    """Sends the event to the tables whose open page shows this top-level comment."""
+async def _send_to_page(comment_id, payload, newest=False):
+    """Sends the event to the tables whose open page shows this top-level comment.
+
+    A comment just created is the newest one, so by date its place needs no counting: it is
+    the first, or the last. Comments posted at the same moment may swap places, which only
+    matters at a page boundary, and the clients reload the page anyway."""
     sizes = viewers.page_sizes()
     if not sizes:
         return
-    positions = await in_db_thread(queries.positions, comment_id, list(sizes))
+    positions = {}
+    if newest:
+        if "CREATED_AT_DESC" in sizes:
+            positions["CREATED_AT_DESC"] = 0
+        if "CREATED_AT_ASC" in sizes:
+            positions["CREATED_AT_ASC"] = await in_db_thread(queries.top_level_count.get) - 1
+    counted = [ordering for ordering in sizes if ordering not in positions]
+    if counted:
+        positions.update(await in_db_thread(queries.positions, comment_id, counted))
     layer = get_channel_layer()
     message = {"type": EVENT_HANDLER, "payload": payload}
     for ordering, page_sizes in sizes.items():
@@ -121,7 +134,7 @@ async def comment_created(comment, parent):
             "rootId": str(comment["root_id"]) if parent else None,
         }
         if parent is None:
-            await _send_to_page(comment["id"], created)
+            await _send_to_page(comment["id"], created, newest=True)
             return
         await _send_to_branch(parent["id"], created)
         count = await in_db_thread(queries.reply_count, parent["id"])
@@ -132,3 +145,21 @@ async def comment_created(comment, parent):
             await _send_to_branch(parent["parent_id"], changed)
     except Exception:
         logger.exception("Could not send events about comment %s", comment["id"])
+
+
+# Keeps the tasks of comment_created_later alive until they finish.
+_dispatching = set()
+
+
+def comment_created_later(comment, parent):
+    """Sends the events about a saved comment without making its author wait: finding out
+    who sees the comment costs more than saving it."""
+    task = asyncio.create_task(comment_created(comment, parent))
+    _dispatching.add(task)
+    task.add_done_callback(_dispatching.discard)
+
+
+async def finish_dispatching():
+    """Waits until the events of the comments saved so far are sent (for tests)."""
+    while _dispatching:
+        await asyncio.gather(*_dispatching)
