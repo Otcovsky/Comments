@@ -1,0 +1,183 @@
+{
+  "meta": {
+    "suite_version": 2,
+    "profile": "load",
+    "rate": 24,
+    "duration": "60s",
+    "warmup": "15s",
+    "ws_clients": 0,
+    "ws_front": 0,
+    "viewers": 0,
+    "seed": 1,
+    "slo_p95_ms": 500,
+    "base_url": "http://10.0.0.122",
+    "mix": {
+      "list": 0.6,
+      "thread": 0.25,
+      "write": 0.1,
+      "preview": 0.03,
+      "attach": 0.02
+    },
+    "finished_at": "2026-11-07T12:01:00.308Z"
+  },
+  "passed": true,
+  "thresholds": {
+    "http_req_failed{phase:main}: rate<0.01": true,
+    "http_req_duration{phase:main}: p(95)<500": true,
+    "dropped_iterations: count<1": true,
+    "http_req_failed{phase:media}: rate<0.01": true,
+    "http_req_failed{phase:live}: rate<0.01": true,
+    "api_ok: rate>0.99": true,
+    "attach_ready: rate>0.99": true,
+    "content_ok: rate>0.99": true
+  },
+  "http": {
+    "requests_main": 1696,
+    "requests_live": 0,
+    "failed_rate_live": 0,
+    "requests_total": 2124,
+    "failed_rate_main": 0,
+    "duration_main": {
+      "avg": 20.90301792040097,
+      "med": 14.994757,
+      "p90": 44.70581,
+      "p95": 52.28496924999986,
+      "p99": 133.34407715,
+      "max": 418.703712,
+      "count": 1696
+    },
+    "dropped_iterations": 0
+  },
+  "media": {
+    "requests": 203,
+    "failed_rate": 0,
+    "bytes": 3164330
+  },
+  "endpoints": {
+    "list": {
+      "avg": 27.514533657803444,
+      "med": 17.021247,
+      "p90": 48.54674560000001,
+      "p95": 68.3847356,
+      "p99": 135.09394715999997,
+      "max": 259.514174,
+      "count": 865
+    },
+    "thread": {
+      "avg": 9.990913924999996,
+      "med": 7.972080999999999,
+      "p90": 12.1279141,
+      "p95": 14.794108099999994,
+      "p99": 58.91961686,
+      "max": 105.691983,
+      "count": 360
+    },
+    "branch": {
+      "avg": 7.5002853246753265,
+      "med": 6.573834,
+      "p90": 10.240316400000001,
+      "p95": 11.954821599999994,
+      "p99": 16.470843239999997,
+      "max": 18.930337,
+      "count": 77
+    },
+    "captcha": {
+      "avg": 12.597208057142858,
+      "med": 10.460694,
+      "p90": 16.027627,
+      "p95": 19.038065899999996,
+      "p99": 48.313930899999995,
+      "max": 84.218913,
+      "count": 175
+    },
+    "create": {
+      "avg": 16.034170441379313,
+      "med": 15.969282,
+      "p90": 20.0766236,
+      "p95": 25.814676799999994,
+      "p99": 40.09296156,
+      "max": 69.620078,
+      "count": 145
+    },
+    "preview": {
+      "avg": 4.782668136363638,
+      "med": 3.5952985,
+      "p90": 7.373886000000001,
+      "p95": 9.002778099999999,
+      "p99": 19.080735789999995,
+      "max": 23.044238,
+      "count": 44
+    },
+    "attach": {
+      "avg": 91.2430758,
+      "med": 58.207479500000005,
+      "p90": 149.140335,
+      "p95": 162.8274246,
+      "p99": 344.82403409999995,
+      "max": 418.703712,
+      "count": 30
+    },
+    "reload": null,
+    "reload-thread": null,
+    "media": {
+      "avg": 11.124626645320197,
+      "med": 0.926964,
+      "p90": 29.375615000000007,
+      "p95": 38.07335559999999,
+      "p99": 115.39484337999997,
+      "max": 320.308727,
+      "count": 203
+    }
+  },
+  "failed_by_scenario": {
+    "list": 0,
+    "thread": 0,
+    "write": 0,
+    "preview": 0,
+    "attach": 0
+  },
+  "ws": {
+    "delivery": null,
+    "messages": 0,
+    "front_events": 0,
+    "errors": 0,
+    "sessions": 0,
+    "connecting": null
+  },
+  "api_ok": {
+    "rate": 1,
+    "count": 1895
+  },
+  "content_ok": {
+    "rate": 1,
+    "count": 1745
+  },
+  "fresh": {
+    "list": {
+      "rate": null,
+      "count": 0
+    },
+    "thread": {
+      "rate": null,
+      "count": 0
+    },
+    "visible": null
+  },
+  "attach_ready": {
+    "rate": 1,
+    "count": 30,
+    "time": {
+      "avg": 24.4,
+      "med": 22.5,
+      "p90": 32.1,
+      "p95": 34.099999999999994,
+      "p99": 35.71,
+      "max": 36,
+      "count": 30
+    }
+  },
+  "comments_created": 175,
+  "comments_created_top": 82,
+  "data_received_bytes": 18342782,
+  "checks_rate": 1
+}

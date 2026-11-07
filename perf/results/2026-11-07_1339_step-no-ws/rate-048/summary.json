@@ -1,0 +1,183 @@
+{
+  "meta": {
+    "suite_version": 2,
+    "profile": "load",
+    "rate": 48,
+    "duration": "60s",
+    "warmup": "15s",
+    "ws_clients": 0,
+    "ws_front": 0,
+    "viewers": 0,
+    "seed": 1,
+    "slo_p95_ms": 500,
+    "base_url": "http://10.0.0.122",
+    "mix": {
+      "list": 0.6,
+      "thread": 0.25,
+      "write": 0.1,
+      "preview": 0.03,
+      "attach": 0.02
+    },
+    "finished_at": "2026-11-07T12:10:23.567Z"
+  },
+  "passed": true,
+  "thresholds": {
+    "api_ok: rate>0.99": true,
+    "http_req_duration{phase:main}: p(95)<500": true,
+    "http_req_failed{phase:main}: rate<0.01": true,
+    "attach_ready: rate>0.99": true,
+    "dropped_iterations: count<1": true,
+    "http_req_failed{phase:media}: rate<0.01": true,
+    "http_req_failed{phase:live}: rate<0.01": true,
+    "content_ok: rate>0.99": true
+  },
+  "http": {
+    "requests_main": 3401,
+    "requests_live": 0,
+    "failed_rate_live": 0,
+    "requests_total": 4337,
+    "failed_rate_main": 0,
+    "duration_main": {
+      "avg": 32.75761902264036,
+      "med": 16.124723,
+      "p90": 60.778154,
+      "p95": 97.434383,
+      "p99": 407.473103,
+      "max": 1103.721298,
+      "count": 3401
+    },
+    "dropped_iterations": 0
+  },
+  "media": {
+    "requests": 491,
+    "failed_rate": 0,
+    "bytes": 16735122
+  },
+  "endpoints": {
+    "list": {
+      "avg": 48.59828095893576,
+      "med": 20.704266,
+      "p90": 85.7950502,
+      "p95": 141.56802679999998,
+      "p99": 539.4296405999997,
+      "max": 1103.721298,
+      "count": 1729
+    },
+    "thread": {
+      "avg": 12.00128891400833,
+      "med": 9.368409,
+      "p90": 16.285004,
+      "p95": 19.084459,
+      "p99": 90.02348079999997,
+      "max": 206.990629,
+      "count": 721
+    },
+    "branch": {
+      "avg": 10.876519941176472,
+      "med": 8.294623,
+      "p90": 16.2989881,
+      "p95": 20.141612099999996,
+      "p99": 54.75515168999993,
+      "max": 99.066152,
+      "count": 170
+    },
+    "captcha": {
+      "avg": 13.27354104034582,
+      "med": 12.927107,
+      "p90": 19.106106,
+      "p95": 22.10051409999999,
+      "p99": 28.501643399999992,
+      "max": 46.790361,
+      "count": 347
+    },
+    "create": {
+      "avg": 18.70911402768166,
+      "med": 15.49896,
+      "p90": 24.121741000000004,
+      "p95": 32.460071,
+      "p99": 115.76596663999995,
+      "max": 212.089975,
+      "count": 289
+    },
+    "preview": {
+      "avg": 6.538239229885055,
+      "med": 4.174821,
+      "p90": 8.778436800000003,
+      "p95": 11.136705199999996,
+      "p99": 53.08762451999997,
+      "max": 87.750413,
+      "count": 87
+    },
+    "attach": {
+      "avg": 108.5968502241379,
+      "med": 76.253134,
+      "p90": 180.6136521,
+      "p95": 198.84459819999984,
+      "p99": 347.1171530099999,
+      "max": 453.947583,
+      "count": 58
+    },
+    "reload": null,
+    "reload-thread": null,
+    "media": {
+      "avg": 7.590411319755599,
+      "med": 1.026085,
+      "p90": 21.601031,
+      "p95": 28.634407999999997,
+      "p99": 89.29677689999998,
+      "max": 404.490128,
+      "count": 491
+    }
+  },
+  "failed_by_scenario": {
+    "list": 0,
+    "thread": 0,
+    "write": 0,
+    "preview": 0,
+    "attach": 0
+  },
+  "ws": {
+    "delivery": null,
+    "messages": 0,
+    "front_events": 0,
+    "errors": 0,
+    "sessions": 0,
+    "connecting": null
+  },
+  "api_ok": {
+    "rate": 1,
+    "count": 3798
+  },
+  "content_ok": {
+    "rate": 1,
+    "count": 3504
+  },
+  "fresh": {
+    "list": {
+      "rate": null,
+      "count": 0
+    },
+    "thread": {
+      "rate": null,
+      "count": 0
+    },
+    "visible": null
+  },
+  "attach_ready": {
+    "rate": 1,
+    "count": 58,
+    "time": {
+      "avg": 24.482758620689655,
+      "med": 22,
+      "p90": 30.6,
+      "p95": 48.15,
+      "p99": 68.77999999999997,
+      "max": 95,
+      "count": 58
+    }
+  },
+  "comments_created": 347,
+  "comments_created_top": 167,
+  "data_received_bytes": 46264117,
+  "checks_rate": 1
+}

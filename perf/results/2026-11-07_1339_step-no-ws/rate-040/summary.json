@@ -1,0 +1,183 @@
+{
+  "meta": {
+    "suite_version": 2,
+    "profile": "load",
+    "rate": 40,
+    "duration": "60s",
+    "warmup": "15s",
+    "ws_clients": 0,
+    "ws_front": 0,
+    "viewers": 0,
+    "seed": 1,
+    "slo_p95_ms": 500,
+    "base_url": "http://10.0.0.122",
+    "mix": {
+      "list": 0.6,
+      "thread": 0.25,
+      "write": 0.1,
+      "preview": 0.03,
+      "attach": 0.02
+    },
+    "finished_at": "2026-11-07T12:08:01.586Z"
+  },
+  "passed": true,
+  "thresholds": {
+    "http_req_duration{phase:main}: p(95)<500": true,
+    "http_req_failed{phase:media}: rate<0.01": true,
+    "dropped_iterations: count<1": true,
+    "attach_ready: rate>0.99": true,
+    "http_req_failed{phase:live}: rate<0.01": true,
+    "content_ok: rate>0.99": true,
+    "http_req_failed{phase:main}: rate<0.01": true,
+    "api_ok: rate>0.99": true
+  },
+  "http": {
+    "requests_main": 2830,
+    "requests_live": 0,
+    "failed_rate_live": 0,
+    "requests_total": 3554,
+    "failed_rate_main": 0,
+    "duration_main": {
+      "avg": 21.844733060423998,
+      "med": 14.999398,
+      "p90": 45.456727,
+      "p95": 58.37331899999998,
+      "p99": 129.45089407999996,
+      "max": 629.765009,
+      "count": 2830
+    },
+    "dropped_iterations": 0
+  },
+  "media": {
+    "requests": 346,
+    "failed_rate": 0,
+    "bytes": 6278690
+  },
+  "endpoints": {
+    "list": {
+      "avg": 27.757898156835484,
+      "med": 17.48901,
+      "p90": 51.362305,
+      "p95": 68.381513,
+      "p99": 125.87532139999999,
+      "max": 188.397452,
+      "count": 1441
+    },
+    "thread": {
+      "avg": 10.364275808652241,
+      "med": 8.105842,
+      "p90": 14.489955,
+      "p95": 17.130488,
+      "p99": 43.143943,
+      "max": 127.284497,
+      "count": 601
+    },
+    "branch": {
+      "avg": 8.281949970370372,
+      "med": 6.961436,
+      "p90": 13.2244206,
+      "p95": 14.625574899999998,
+      "p99": 19.002441439999995,
+      "max": 22.778558,
+      "count": 135
+    },
+    "captcha": {
+      "avg": 16.239938431034485,
+      "med": 14.158513,
+      "p90": 24.2697699,
+      "p95": 27.172501999999998,
+      "p99": 56.71769108999998,
+      "max": 101.756245,
+      "count": 290
+    },
+    "create": {
+      "avg": 16.269904510373447,
+      "med": 15.427759,
+      "p90": 22.139075,
+      "p95": 25.446852,
+      "p99": 40.550537599999984,
+      "max": 150.304215,
+      "count": 241
+    },
+    "preview": {
+      "avg": 8.79861246575342,
+      "med": 5.658509,
+      "p90": 12.1952382,
+      "p95": 14.223433599999991,
+      "p99": 45.57089755999997,
+      "max": 80.020253,
+      "count": 73
+    },
+    "attach": {
+      "avg": 106.15392791836736,
+      "med": 62.389762,
+      "p90": 155.1833284,
+      "p95": 252.22969299999977,
+      "p99": 553.62386708,
+      "max": 629.765009,
+      "count": 49
+    },
+    "reload": null,
+    "reload-thread": null,
+    "media": {
+      "avg": 10.089179208092489,
+      "med": 0.939265,
+      "p90": 26.470916500000012,
+      "p95": 49.935446999999996,
+      "p99": 115.24434489999994,
+      "max": 162.933641,
+      "count": 346
+    }
+  },
+  "failed_by_scenario": {
+    "list": 0,
+    "thread": 0,
+    "write": 0,
+    "preview": 0,
+    "attach": 0
+  },
+  "ws": {
+    "delivery": null,
+    "messages": 0,
+    "front_events": 0,
+    "errors": 0,
+    "sessions": 0,
+    "connecting": null
+  },
+  "api_ok": {
+    "rate": 1,
+    "count": 3167
+  },
+  "content_ok": {
+    "rate": 1,
+    "count": 2921
+  },
+  "fresh": {
+    "list": {
+      "rate": null,
+      "count": 0
+    },
+    "thread": {
+      "rate": null,
+      "count": 0
+    },
+    "visible": null
+  },
+  "attach_ready": {
+    "rate": 1,
+    "count": 49,
+    "time": {
+      "avg": 26.857142857142858,
+      "med": 22,
+      "p90": 38.000000000000014,
+      "p95": 58.999999999999986,
+      "p99": 85.12,
+      "max": 88,
+      "count": 49
+    }
+  },
+  "comments_created": 290,
+  "comments_created_top": 149,
+  "data_received_bytes": 30477192,
+  "checks_rate": 1
+}

@@ -1,0 +1,12 @@
+{
+  "label": "step-no-ws",
+  "mode": "step",
+  "suite_version": 2,
+  "started_at": "2026-11-07T11:39:32Z",
+  "local_git_sha": "c87180d58b4697641f55db4a364114605464a134",
+  "local_git_dirty_files": 0,
+  "app": {"git_sha": "1de796bd7fb83f2717020053edc9dcb5537cce81", "git_dirty_files": null, "images": [{"ID":"sha256:924072b5f9340c11d6b4eec690eb23892095a705bdfa194b0d254468b591024c","ContainerName":"comments-backend-1","Repository":"comments-backend","Tag":"latest","Platform":"linux/arm64","Size":173123426,"LastTagTime":"2026-11-07T10:06:50.042896403Z"},{"ID":"sha256:0f29423ec2193ee5b080f999eeba11a969fb82228a7f887c5f3f3e1a0cb170bb","ContainerName":"comments-frontend-1","Repository":"comments-frontend","Tag":"latest","Platform":"linux/arm64","Size":22121173,"LastTagTime":"2026-11-07T10:06:50.868923884Z"}]},
+  "k6": "k6 v2.3.0 (commit/e088784614, go1.26.8, linux/arm64)",
+  "seed_args": "--top 10000 --replies 50000 --authors 2000 --seed 42",
+  "env_overrides": "WS_CLIENTS=0 "
+}

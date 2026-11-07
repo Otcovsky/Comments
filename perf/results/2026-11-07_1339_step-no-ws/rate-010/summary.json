@@ -1,0 +1,183 @@
+{
+  "meta": {
+    "suite_version": 2,
+    "profile": "load",
+    "rate": 10,
+    "duration": "60s",
+    "warmup": "15s",
+    "ws_clients": 0,
+    "ws_front": 0,
+    "viewers": 0,
+    "seed": 1,
+    "slo_p95_ms": 500,
+    "base_url": "http://10.0.0.122",
+    "mix": {
+      "list": 0.6,
+      "thread": 0.25,
+      "write": 0.1,
+      "preview": 0.03,
+      "attach": 0.02
+    },
+    "finished_at": "2026-11-07T11:49:14.302Z"
+  },
+  "passed": true,
+  "thresholds": {
+    "api_ok: rate>0.99": true,
+    "attach_ready: rate>0.99": true,
+    "http_req_failed{phase:live}: rate<0.01": true,
+    "content_ok: rate>0.99": true,
+    "http_req_failed{phase:media}: rate<0.01": true,
+    "dropped_iterations: count<1": true,
+    "http_req_duration{phase:main}: p(95)<500": true,
+    "http_req_failed{phase:main}: rate<0.01": true
+  },
+  "http": {
+    "requests_main": 715,
+    "requests_live": 0,
+    "failed_rate_live": 0,
+    "requests_total": 900,
+    "failed_rate_main": 0,
+    "duration_main": {
+      "avg": 21.05958405734264,
+      "med": 15.119036,
+      "p90": 44.1474066,
+      "p95": 53.953500099999964,
+      "p99": 125.49586993999992,
+      "max": 329.927624,
+      "count": 715
+    },
+    "dropped_iterations": 0
+  },
+  "media": {
+    "requests": 87,
+    "failed_rate": 0,
+    "bytes": 1077421
+  },
+  "endpoints": {
+    "list": {
+      "avg": 25.174446944598348,
+      "med": 15.8428,
+      "p90": 45.66595,
+      "p95": 64.149644,
+      "p99": 86.36787559999996,
+      "max": 130.482779,
+      "count": 361
+    },
+    "thread": {
+      "avg": 10.557443715231791,
+      "med": 7.98156,
+      "p90": 13.77299,
+      "p95": 16.053181,
+      "p99": 59.81640199999996,
+      "max": 113.810853,
+      "count": 151
+    },
+    "branch": {
+      "avg": 7.926507861111113,
+      "med": 6.6742935,
+      "p90": 11.956620500000001,
+      "p95": 15.883670749999999,
+      "p99": 18.837620949999998,
+      "max": 20.409423,
+      "count": 36
+    },
+    "captcha": {
+      "avg": 15.431747148648654,
+      "med": 14.3794525,
+      "p90": 21.2764037,
+      "p95": 25.140415049999998,
+      "p99": 51.180718029999994,
+      "max": 52.581945,
+      "count": 74
+    },
+    "create": {
+      "avg": 18.478071672131147,
+      "med": 16.332883,
+      "p90": 25.087607,
+      "p95": 27.880901,
+      "p99": 62.94396579999995,
+      "max": 111.418162,
+      "count": 61
+    },
+    "preview": {
+      "avg": 7.9677749473684205,
+      "med": 5.991871,
+      "p90": 11.4383218,
+      "p95": 13.21205889999999,
+      "p99": 21.65188378,
+      "max": 23.76184,
+      "count": 19
+    },
+    "attach": {
+      "avg": 128.43073730769234,
+      "med": 127.398082,
+      "p90": 243.39310720000003,
+      "p95": 292.79893219999997,
+      "p99": 322.50188563999995,
+      "max": 329.927624,
+      "count": 13
+    },
+    "reload": null,
+    "reload-thread": null,
+    "media": {
+      "avg": 14.096678091954024,
+      "med": 1.010285,
+      "p90": 34.9581204,
+      "p95": 51.007405399999996,
+      "p99": 106.7222318,
+      "max": 111.745724,
+      "count": 87
+    }
+  },
+  "failed_by_scenario": {
+    "list": 0,
+    "thread": 0,
+    "write": 0,
+    "preview": 0,
+    "attach": 0
+  },
+  "ws": {
+    "delivery": null,
+    "messages": 0,
+    "front_events": 0,
+    "errors": 0,
+    "sessions": 0,
+    "connecting": null
+  },
+  "api_ok": {
+    "rate": 1,
+    "count": 804
+  },
+  "content_ok": {
+    "rate": 1,
+    "count": 738
+  },
+  "fresh": {
+    "list": {
+      "rate": null,
+      "count": 0
+    },
+    "thread": {
+      "rate": null,
+      "count": 0
+    },
+    "visible": null
+  },
+  "attach_ready": {
+    "rate": 1,
+    "count": 13,
+    "time": {
+      "avg": 21.384615384615383,
+      "med": 22,
+      "p90": 26.400000000000002,
+      "p95": 28.2,
+      "p99": 29.64,
+      "max": 30,
+      "count": 13
+    }
+  },
+  "comments_created": 74,
+  "comments_created_top": 30,
+  "data_received_bytes": 7819251,
+  "checks_rate": 1
+}

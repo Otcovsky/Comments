@@ -1,0 +1,183 @@
+{
+  "meta": {
+    "suite_version": 2,
+    "profile": "load",
+    "rate": 64,
+    "duration": "60s",
+    "warmup": "15s",
+    "ws_clients": 0,
+    "ws_front": 0,
+    "viewers": 0,
+    "seed": 1,
+    "slo_p95_ms": 500,
+    "base_url": "http://10.0.0.122",
+    "mix": {
+      "list": 0.6,
+      "thread": 0.25,
+      "write": 0.1,
+      "preview": 0.03,
+      "attach": 0.02
+    },
+    "finished_at": "2026-11-07T12:15:15.269Z"
+  },
+  "passed": true,
+  "thresholds": {
+    "attach_ready: rate>0.99": true,
+    "http_req_failed{phase:live}: rate<0.01": true,
+    "content_ok: rate>0.99": true,
+    "dropped_iterations: count<1": true,
+    "api_ok: rate>0.99": true,
+    "http_req_duration{phase:main}: p(95)<500": true,
+    "http_req_failed{phase:main}: rate<0.01": true,
+    "http_req_failed{phase:media}: rate<0.01": true
+  },
+  "http": {
+    "requests_main": 4545,
+    "requests_live": 0,
+    "failed_rate_live": 0,
+    "requests_total": 5900,
+    "failed_rate_main": 0,
+    "duration_main": {
+      "avg": 27.871721370516976,
+      "med": 15.892562,
+      "p90": 56.424499000000004,
+      "p95": 83.06858179999998,
+      "p99": 193.51019807999998,
+      "max": 645.391334,
+      "count": 4545
+    },
+    "dropped_iterations": 0
+  },
+  "media": {
+    "requests": 780,
+    "failed_rate": 0,
+    "bytes": 15410584
+  },
+  "endpoints": {
+    "list": {
+      "avg": 39.082387938802064,
+      "med": 19.9985435,
+      "p90": 73.0934657,
+      "p95": 111.20278279999985,
+      "p99": 283.01939936999986,
+      "max": 600.690824,
+      "count": 2304
+    },
+    "thread": {
+      "avg": 12.813761067637879,
+      "med": 10.043532,
+      "p90": 16.920568,
+      "p95": 23.016439,
+      "p99": 90.21882599999995,
+      "max": 175.926149,
+      "count": 961
+    },
+    "branch": {
+      "avg": 11.431758584033611,
+      "med": 9.472909000000001,
+      "p90": 16.830803,
+      "p95": 20.824335449999996,
+      "p99": 43.11956966,
+      "max": 96.672459,
+      "count": 238
+    },
+    "captcha": {
+      "avg": 13.5940868336933,
+      "med": 11.836901,
+      "p90": 18.708633,
+      "p95": 22.940422899999998,
+      "p99": 66.60870615999995,
+      "max": 113.226625,
+      "count": 463
+    },
+    "create": {
+      "avg": 20.345154132467535,
+      "med": 16.271004,
+      "p90": 30.3196286,
+      "p95": 42.26921019999994,
+      "p99": 106.61088415999984,
+      "max": 189.73422,
+      "count": 385
+    },
+    "preview": {
+      "avg": 7.089830077586207,
+      "med": 4.497662999999999,
+      "p90": 12.2237235,
+      "p95": 16.1726135,
+      "p99": 60.382419549999945,
+      "max": 94.093806,
+      "count": 116
+    },
+    "attach": {
+      "avg": 85.21797506410259,
+      "med": 58.319041,
+      "p90": 170.0484859,
+      "p95": 190.47505199999998,
+      "p99": 316.7319221499997,
+      "max": 645.391334,
+      "count": 78
+    },
+    "reload": null,
+    "reload-thread": null,
+    "media": {
+      "avg": 6.447835273076922,
+      "med": 1.052265,
+      "p90": 21.468195,
+      "p95": 30.42443514999998,
+      "p99": 91.64948335999998,
+      "max": 178.242641,
+      "count": 780
+    }
+  },
+  "failed_by_scenario": {
+    "list": 0,
+    "thread": 0,
+    "write": 0,
+    "preview": 0,
+    "attach": 0
+  },
+  "ws": {
+    "delivery": null,
+    "messages": 0,
+    "front_events": 0,
+    "errors": 0,
+    "sessions": 0,
+    "connecting": null
+  },
+  "api_ok": {
+    "rate": 1,
+    "count": 5067
+  },
+  "content_ok": {
+    "rate": 1,
+    "count": 4677
+  },
+  "fresh": {
+    "list": {
+      "rate": null,
+      "count": 0
+    },
+    "thread": {
+      "rate": null,
+      "count": 0
+    },
+    "visible": null
+  },
+  "attach_ready": {
+    "rate": 1,
+    "count": 78,
+    "time": {
+      "avg": 32.12820512820513,
+      "med": 22,
+      "p90": 52.20000000000001,
+      "p95": 101.94999999999982,
+      "p99": 157.43999999999997,
+      "max": 179,
+      "count": 78
+    }
+  },
+  "comments_created": 463,
+  "comments_created_top": 221,
+  "data_received_bytes": 53006958,
+  "checks_rate": 1
+}

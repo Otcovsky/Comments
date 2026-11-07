@@ -1,0 +1,183 @@
+{
+  "meta": {
+    "suite_version": 2,
+    "profile": "load",
+    "rate": 4,
+    "duration": "60s",
+    "warmup": "15s",
+    "ws_clients": 0,
+    "ws_front": 0,
+    "viewers": 0,
+    "seed": 1,
+    "slo_p95_ms": 500,
+    "base_url": "http://10.0.0.122",
+    "mix": {
+      "list": 0.6,
+      "thread": 0.25,
+      "write": 0.1,
+      "preview": 0.03,
+      "attach": 0.02
+    },
+    "finished_at": "2026-11-07T11:42:11.749Z"
+  },
+  "passed": true,
+  "thresholds": {
+    "dropped_iterations: count<1": true,
+    "http_req_duration{phase:main}: p(95)<500": true,
+    "http_req_failed{phase:main}: rate<0.01": true,
+    "http_req_failed{phase:live}: rate<0.01": true,
+    "content_ok: rate>0.99": true,
+    "api_ok: rate>0.99": true,
+    "attach_ready: rate>0.99": true,
+    "http_req_failed{phase:media}: rate<0.01": true
+  },
+  "http": {
+    "requests_main": 287,
+    "requests_live": 0,
+    "failed_rate_live": 0,
+    "requests_total": 358,
+    "failed_rate_main": 0,
+    "duration_main": {
+      "avg": 20.747974463414618,
+      "med": 15.38012,
+      "p90": 44.0496858,
+      "p95": 47.963281699999996,
+      "p99": 110.50651879999995,
+      "max": 268.049316,
+      "count": 287
+    },
+    "dropped_iterations": 0
+  },
+  "media": {
+    "requests": 27,
+    "failed_rate": 0,
+    "bytes": 307840
+  },
+  "endpoints": {
+    "list": {
+      "avg": 24.310007586206883,
+      "med": 16.478925,
+      "p90": 45.7284782,
+      "p95": 49.36902519999999,
+      "p99": 71.85820616,
+      "max": 108.059043,
+      "count": 145
+    },
+    "thread": {
+      "avg": 10.8767,
+      "med": 7.9483820000000005,
+      "p90": 13.466786200000001,
+      "p95": 17.920883699999973,
+      "p99": 59.558134009999996,
+      "max": 59.798831,
+      "count": 60
+    },
+    "branch": {
+      "avg": 7.904486599999999,
+      "med": 6.888596,
+      "p90": 11.752308800000002,
+      "p95": 14.402238699999998,
+      "p99": 15.25561654,
+      "max": 15.468961,
+      "count": 15
+    },
+    "captcha": {
+      "avg": 14.928091000000002,
+      "med": 12.252504,
+      "p90": 19.720775000000003,
+      "p95": 33.56324469999997,
+      "p99": 45.83200198,
+      "max": 46.817404,
+      "count": 30
+    },
+    "create": {
+      "avg": 20.25602856,
+      "med": 15.937963,
+      "p90": 29.296864200000005,
+      "p95": 43.913836199999984,
+      "p99": 93.01456579999999,
+      "max": 107.747081,
+      "count": 25
+    },
+    "preview": {
+      "avg": 6.996373714285714,
+      "med": 3.79122,
+      "p90": 13.117988400000003,
+      "p95": 20.080724699999994,
+      "p99": 25.65091374,
+      "max": 27.043461,
+      "count": 7
+    },
+    "attach": {
+      "avg": 131.0660424,
+      "med": 125.541013,
+      "p90": 234.31358799999998,
+      "p95": 251.18145199999995,
+      "p99": 264.6757432,
+      "max": 268.049316,
+      "count": 5
+    },
+    "reload": null,
+    "reload-thread": null,
+    "media": {
+      "avg": 24.125827814814816,
+      "med": 25.149491,
+      "p90": 52.17083940000001,
+      "p95": 72.16535599999999,
+      "p99": 80.25504336,
+      "max": 81.489904,
+      "count": 27
+    }
+  },
+  "failed_by_scenario": {
+    "list": 0,
+    "thread": 0,
+    "write": 0,
+    "preview": 0,
+    "attach": 0
+  },
+  "ws": {
+    "delivery": null,
+    "messages": 0,
+    "front_events": 0,
+    "errors": 0,
+    "sessions": 0,
+    "connecting": null
+  },
+  "api_ok": {
+    "rate": 1,
+    "count": 326
+  },
+  "content_ok": {
+    "rate": 1,
+    "count": 296
+  },
+  "fresh": {
+    "list": {
+      "rate": null,
+      "count": 0
+    },
+    "thread": {
+      "rate": null,
+      "count": 0
+    },
+    "visible": null
+  },
+  "attach_ready": {
+    "rate": 1,
+    "count": 5,
+    "time": {
+      "avg": 28.4,
+      "med": 27,
+      "p90": 34.4,
+      "p95": 36.199999999999996,
+      "p99": 37.64,
+      "max": 38,
+      "count": 5
+    }
+  },
+  "comments_created": 30,
+  "comments_created_top": 15,
+  "data_received_bytes": 3219695,
+  "checks_rate": 1
+}
