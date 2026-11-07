@@ -1,0 +1,191 @@
+{
+  "meta": {
+    "suite_version": 3,
+    "profile": "load",
+    "rate": 8,
+    "duration": "40s",
+    "warmup": "10s",
+    "ws_clients": 50,
+    "ws_front": 25,
+    "viewers": 0,
+    "seed": 1,
+    "slo_p95_ms": 500,
+    "base_url": "http://10.0.0.122",
+    "mix": {
+      "list": 0.6,
+      "thread": 0.25,
+      "write": 0.1,
+      "preview": 0.03,
+      "attach": 0.02
+    },
+    "finished_at": "2026-11-07T13:21:41.782Z"
+  },
+  "passed": true,
+  "thresholds": {
+    "http_req_failed{phase:main}: rate<0.01": true,
+    "dropped_iterations: count<1": true,
+    "http_req_failed{phase:live}: rate<0.01": true,
+    "http_req_failed{phase:media}: rate<0.01": true,
+    "http_req_duration{phase:main}: p(95)<500": true,
+    "attach_ready: rate>0.99": true,
+    "content_ok: rate>0.99": true,
+    "api_ok: rate>0.99": true
+  },
+  "http": {
+    "requests_main": 388,
+    "requests_live": 0,
+    "failed_rate_live": 0,
+    "requests_total": 546,
+    "failed_rate_main": 0,
+    "duration_main": {
+      "avg": 29.718421448453583,
+      "med": 15.304199,
+      "p90": 81.90395360000002,
+      "p95": 98.76442249999997,
+      "p99": 153.83811409999987,
+      "max": 327.802048,
+      "count": 388
+    },
+    "dropped_iterations": 0
+  },
+  "media": {
+    "requests": 26,
+    "failed_rate": 0,
+    "bytes": 258932
+  },
+  "endpoints": {
+    "list": {
+      "avg": 29.226764347150258,
+      "med": 16.385124,
+      "p90": 58.55014160000001,
+      "p95": 78.97890259999997,
+      "p99": 116.04697603999996,
+      "max": 213.105258,
+      "count": 193
+    },
+    "thread": {
+      "avg": 10.133287728395063,
+      "med": 7.87468,
+      "p90": 12.908506,
+      "p95": 16.490324,
+      "p99": 40.746657999999954,
+      "max": 88.236374,
+      "count": 81
+    },
+    "branch": {
+      "avg": 6.856026833333334,
+      "med": 6.176572,
+      "p90": 8.552167400000002,
+      "p95": 11.848120599999998,
+      "p99": 12.3914094,
+      "max": 12.416783,
+      "count": 24
+    },
+    "captcha": {
+      "avg": 16.322956974999997,
+      "med": 11.9266215,
+      "p90": 23.878334800000008,
+      "p95": 46.05374165,
+      "p99": 74.03625714999998,
+      "max": 90.313225,
+      "count": 40
+    },
+    "create": {
+      "avg": 99.01776203030306,
+      "med": 85.622561,
+      "p90": 145.3146362,
+      "p95": 162.75663799999995,
+      "p99": 188.36891072,
+      "max": 191.095184,
+      "count": 33
+    },
+    "preview": {
+      "avg": 5.863822300000001,
+      "med": 3.6078585,
+      "p90": 12.753965400000002,
+      "p95": 15.624890699999998,
+      "p99": 17.92163094,
+      "max": 18.495816,
+      "count": 10
+    },
+    "attach": {
+      "avg": 132.21405771428573,
+      "med": 100.141116,
+      "p90": 218.39566000000002,
+      "p95": 273.09885399999996,
+      "p99": 316.8614092,
+      "max": 327.802048,
+      "count": 7
+    },
+    "reload": null,
+    "reload-thread": null,
+    "media": {
+      "avg": 26.08624053846154,
+      "med": 24.8032275,
+      "p90": 58.6934425,
+      "p95": 68.84326449999999,
+      "p99": 76.27188325,
+      "max": 78.137243,
+      "count": 26
+    }
+  },
+  "failed_by_scenario": {
+    "list": 0,
+    "thread": 0,
+    "write": 0,
+    "preview": 0,
+    "attach": 0
+  },
+  "ws": {
+    "delivery": null,
+    "messages": 900,
+    "front_events": 575,
+    "errors": 0,
+    "sessions": 50,
+    "connecting": {
+      "avg": 82.88423634000003,
+      "med": 60.790833,
+      "p90": 181.9595805,
+      "p95": 193.75479339999998,
+      "p99": 201.90756713,
+      "max": 202.228401,
+      "count": 50
+    }
+  },
+  "api_ok": {
+    "rate": 1,
+    "count": 516
+  },
+  "content_ok": {
+    "rate": 1,
+    "count": 428
+  },
+  "fresh": {
+    "list": {
+      "rate": null,
+      "count": 0
+    },
+    "thread": {
+      "rate": null,
+      "count": 0
+    },
+    "visible": null
+  },
+  "attach_ready": {
+    "rate": 1,
+    "count": 7,
+    "time": {
+      "avg": 34.714285714285715,
+      "med": 35,
+      "p90": 48,
+      "p95": 55.49999999999999,
+      "p99": 61.5,
+      "max": 63,
+      "count": 7
+    }
+  },
+  "comments_created": 40,
+  "comments_created_top": 23,
+  "data_received_bytes": 4552905,
+  "checks_rate": 1
+}

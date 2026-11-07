@@ -1,0 +1,12 @@
+{
+  "label": "baseline-v3",
+  "mode": "suite",
+  "suite_version": 3,
+  "started_at": "2026-11-07T13:09:32Z",
+  "local_git_sha": "9fe9525dcd537c79ad8bcd28f89cd777bbdf2004",
+  "local_git_dirty_files": 0,
+  "app": {"git_sha": "9fe9525dcd537c79ad8bcd28f89cd777bbdf2004", "git_dirty_files": null, "images": [{"ID":"sha256:0e98bb69f6f7b6e8c46e0fd5c9fe5d3bcebb658d30472dfa113606c0df995cc9","ContainerName":"comments-backend-1","Repository":"comments-backend","Tag":"latest","Platform":"linux/arm64","Size":173123807,"LastTagTime":"2026-11-07T13:09:07.936002648Z"},{"ID":"sha256:524a1c13b8f68d1408430bc6d25268e4580b8f9ebb816907bac26ddbb8a25f4c","ContainerName":"comments-frontend-1","Repository":"comments-frontend","Tag":"latest","Platform":"linux/arm64","Size":22121173,"LastTagTime":"2026-11-07T13:09:08.848798796Z"}]},
+  "k6": "k6 v2.3.0 (commit/e088784614, go1.26.8, linux/arm64)",
+  "seed_args": "--top 10000 --replies 50000 --authors 2000 --seed 42",
+  "env_overrides": ""
+}

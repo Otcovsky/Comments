@@ -1,0 +1,138 @@
+{
+  "meta": {
+    "suite_version": 3,
+    "profile": "upload",
+    "rate": 2,
+    "duration": "90s",
+    "warmup": "15s",
+    "ws_clients": 0,
+    "ws_front": 0,
+    "viewers": 0,
+    "seed": 1,
+    "slo_p95_ms": 500,
+    "base_url": "http://10.0.0.122",
+    "mix": {
+      "attach": 1
+    },
+    "finished_at": "2026-11-07T14:19:39.323Z"
+  },
+  "passed": true,
+  "thresholds": {
+    "http_req_failed{phase:media}: rate<0.01": true,
+    "dropped_iterations{scenario:attach}: count<1": true,
+    "api_ok: rate>0.99": true,
+    "attach_ready: rate>0.99": true,
+    "http_req_failed{phase:live}: rate<0.01": true,
+    "http_req_failed{phase:main}: rate<0.01": true,
+    "content_ok: rate>0.99": true,
+    "http_req_duration{phase:main}: p(95)<500": true
+  },
+  "http": {
+    "requests_main": 362,
+    "requests_live": 0,
+    "failed_rate_live": 0,
+    "requests_total": 566,
+    "failed_rate_main": 0,
+    "duration_main": {
+      "avg": 42.51759802762432,
+      "med": 28.351365,
+      "p90": 122.50703580000001,
+      "p95": 130.4710298,
+      "p99": 156.69393063999996,
+      "max": 538.590598,
+      "count": 362
+    },
+    "dropped_iterations": 0
+  },
+  "media": {
+    "requests": 181,
+    "failed_rate": 0,
+    "bytes": 14541
+  },
+  "endpoints": {
+    "list": null,
+    "thread": null,
+    "branch": null,
+    "captcha": {
+      "avg": 7.769080911602208,
+      "med": 7.229437,
+      "p90": 7.66084,
+      "p95": 8.086242,
+      "p99": 12.621391999999982,
+      "max": 74.343021,
+      "count": 181
+    },
+    "create": null,
+    "preview": null,
+    "attach": {
+      "avg": 77.26611514364643,
+      "med": 53.754196,
+      "p90": 130.519188,
+      "p95": 144.720262,
+      "p99": 217.9843725999998,
+      "max": 538.590598,
+      "count": 181
+    },
+    "reload": null,
+    "reload-thread": null,
+    "media": {
+      "avg": 30.13391612707184,
+      "med": 23.857362,
+      "p90": 42.311257,
+      "p95": 69.508077,
+      "p99": 139.13642479999996,
+      "max": 232.45931,
+      "count": 181
+    }
+  },
+  "failed_by_scenario": {
+    "attach": 0
+  },
+  "dropped_by_scenario": {
+    "attach": 0
+  },
+  "ws": {
+    "delivery": null,
+    "messages": 0,
+    "front_events": 0,
+    "errors": 0,
+    "sessions": 0,
+    "connecting": null
+  },
+  "api_ok": {
+    "rate": 1,
+    "count": 384
+  },
+  "content_ok": {
+    "rate": 1,
+    "count": 379
+  },
+  "fresh": {
+    "list": {
+      "rate": null,
+      "count": 0
+    },
+    "thread": {
+      "rate": null,
+      "count": 0
+    },
+    "visible": null
+  },
+  "attach_ready": {
+    "rate": 1,
+    "count": 181,
+    "time": {
+      "avg": 30.281767955801104,
+      "med": 24,
+      "p90": 43,
+      "p95": 69,
+      "p99": 138.79999999999995,
+      "max": 233,
+      "count": 181
+    }
+  },
+  "comments_created": 181,
+  "comments_created_top": 94,
+  "data_received_bytes": 10548757,
+  "checks_rate": 1
+}
