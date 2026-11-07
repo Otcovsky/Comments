@@ -61,7 +61,8 @@ export function summarize(data, meta) {
       requests_total: value(m.http_reqs, "count"),
       failed_rate_main: value(m["http_req_failed{phase:main}"], "rate"),
       duration_main: ms("http_req_duration{phase:main}"),
-      dropped_iterations: value(m.dropped_iterations, "count") || 0,
+      // Of the scenarios people run, not the warmup.
+      dropped_iterations: Object.values(dropped).reduce((sum, count) => sum + count, 0),
     },
     media: {
       requests: value(m["http_reqs{phase:media}"], "count") || 0,

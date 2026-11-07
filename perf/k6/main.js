@@ -154,8 +154,8 @@ const scenarios = {
     rate: Math.max(1, Math.round(RATE / 2)),
     timeUnit: "1s",
     duration: WARMUP,
-    preAllocatedVUs: 5,
-    maxVUs: 50,
+    preAllocatedVUs: Math.ceil((RATE / 2) * 4) + 4,
+    maxVUs: Math.max(Math.ceil((RATE / 2) * 4) * 5, 50),
     tags: { phase: "warmup" },
   },
 };
@@ -183,7 +183,6 @@ const thresholds = {
   "http_reqs{phase:live}": ["count>=0"],
   "http_req_failed{phase:media}": ["rate<0.01"],
   "http_reqs{phase:media}": ["count>=0"],
-  dropped_iterations: ["count<1"],
   api_ok: ["rate>0.99"],
   content_ok: ["rate>0.99"],
 };
@@ -193,7 +192,8 @@ if (MIX.attach) thresholds.attach_ready = ["rate>0.99"];
 for (const name of Object.keys(MIX)) {
   thresholds[`http_req_duration{scenario:${name}}`] = ["max>=0"];
   thresholds[`http_req_failed{scenario:${name}}`] = ["rate>=0"];
-  thresholds[`dropped_iterations{scenario:${name}}`] = ["count>=0"];
+  // What people do must not lose an iteration; the warmup is not measured.
+  thresholds[`dropped_iterations{scenario:${name}}`] = ["count<1"];
 }
 // Per operation, main phase only (warmup requests have the same names).
 for (const name of ["list", "thread", "branch", "captcha", "create", "preview", "attach"]) {
