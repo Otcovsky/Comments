@@ -1,7 +1,8 @@
 """Database access. Everything here blocks, so callers go through pools.in_db_thread."""
 import threading
 
-from django.db.models import Count, IntegerField, OuterRef, Q, Subquery
+from django.db import connection
+from django.db.models import Count, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 
 from .models import Author, Comment
@@ -15,6 +16,21 @@ ORDERINGS = {
     "EMAIL_ASC": ("email", False),
     "EMAIL_DESC": ("email", True),
 }
+
+# The index of each ordering, given to MySQL by name. On its own it often reads every
+# top-level row through some other index and filters them, which made a position count or
+# a deep page 20-40 ms instead of 3-5 (EXPLAIN ANALYZE on 10,757 top-level comments).
+INDEXES = {
+    "CREATED_AT_DESC": "comments_co_parent__2efacb_idx",
+    "CREATED_AT_ASC": "comments_co_parent__2efacb_idx",
+    "USERNAME_ASC": "comments_top_username_asc",
+    "USERNAME_DESC": "comments_top_username_desc",
+    "EMAIL_ASC": "comments_top_email_asc",
+    "EMAIL_DESC": "comments_top_email_desc",
+}
+# Dates have no index with the ties' -id, so a forced index would sort them all; the plan
+# MySQL picks for them is already fast.
+FORCED_PAGES = ("USERNAME_ASC", "USERNAME_DESC", "EMAIL_ASC", "EMAIL_DESC")
 
 ROW_FIELDS = (
     "id",
@@ -83,10 +99,14 @@ def comment_page(page, page_size, ordering):
     if offset >= count:
         return count, []
     field, descending = ORDERINGS[ordering]
-    # Two steps: when the sort needs a filesort (username, email), MySQL would otherwise run
-    # the reply count subquery for all the top-level comments before applying LIMIT.
-    sorted_ids = _top_level().order_by(f"-{field}" if descending else field, "-id").values_list("pk", flat=True)
-    ids = list(sorted_ids[offset : offset + page_size])
+    # Two steps: the ids of the page from the index alone, then the rows with their reply
+    # counts, so that the count subquery runs for these rows only.
+    if ordering in FORCED_PAGES:
+        order = f"ORDER BY {field} {'DESC' if descending else 'ASC'}, id DESC LIMIT %s OFFSET %s"
+        ids = [row[0] for row in _top_level_sql(ordering, "SELECT id", order, [page_size, offset])]
+    else:
+        sorted_ids = _top_level().order_by(f"-{field}" if descending else field, "-id").values_list("pk", flat=True)
+        ids = list(sorted_ids[offset : offset + page_size])
     rows = _with_reply_count(Comment.objects.filter(pk__in=ids)).values(*ROW_FIELDS)
     by_id = {row["id"]: row for row in rows}
     return count, [by_id[comment_id] for comment_id in ids]
@@ -139,10 +159,22 @@ def positions(comment_id, orderings):
     result = {}
     for ordering in orderings:
         field, descending = ORDERINGS[ordering]
-        earlier = Q(**{f"{field}__{'gt' if descending else 'lt'}": values[field]})
-        earlier |= Q(**{field: values[field], "pk__gt": comment_id})
-        result[ordering] = _top_level().filter(earlier).count()
+        # Two counts and no OR: each is a range of the ordering's index, but for the OR of
+        # both MySQL reads every top-level row.
+        value = values[field]
+        before = _top_level_sql(ordering, "SELECT COUNT(*)", f"AND {field} {'>' if descending else '<'} %s", [value])
+        ties = _top_level_sql(ordering, "SELECT COUNT(*)", f"AND {field} = %s AND id > %s", [value, comment_id])
+        result[ordering] = before[0][0] + ties[0][0]
     return result
+
+
+def _top_level_sql(ordering, select, rest, params):
+    """A query over the top-level comments through the index of the ordering. Only names
+    from ORDERINGS and INDEXES go into the SQL; values are parameters."""
+    sql = f"{select} FROM {Comment._meta.db_table} FORCE INDEX ({INDEXES[ordering]}) WHERE parent_id IS NULL {rest}"
+    with connection.cursor() as cursor:
+        cursor.execute(sql, params)
+        return cursor.fetchall()
 
 
 def reply_count(comment_id):
