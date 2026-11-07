@@ -108,7 +108,8 @@ def _client_address(request):
 
 
 def _check_rate(limiter, request):
-    if not limiter.allow(_client_address(request)):
+    address = _client_address(request)
+    if not ratelimit.is_exempt(address) and not limiter.allow(address):
         raise ApiError("RATE_LIMITED", {"rateLimit": "Слишком много запросов. Подождите минуту."})
 
 

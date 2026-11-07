@@ -7,6 +7,7 @@ import uuid
 from collections import OrderedDict
 from io import BytesIO
 
+from django.conf import settings
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 LENGTH = 5
@@ -48,7 +49,8 @@ store = CaptchaStore()
 
 
 async def issue():
-    answer = "".join(secrets.choice(ALPHABET) for _ in range(LENGTH))
+    # A load test knows the answer in advance; the picture is still drawn and the key single-use.
+    answer = settings.CAPTCHA_TEST_ANSWER or "".join(secrets.choice(ALPHABET) for _ in range(LENGTH))
     image = await asyncio.to_thread(render, answer)
     return store.add(answer), image
 

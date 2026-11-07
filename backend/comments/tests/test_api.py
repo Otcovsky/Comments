@@ -1,3 +1,4 @@
+import ipaddress
 import json
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
@@ -6,7 +7,7 @@ from unittest import mock
 from asgiref.sync import sync_to_async
 from botocore.exceptions import ClientError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import AsyncClient, TransactionTestCase
+from django.test import AsyncClient, TransactionTestCase, override_settings
 from PIL import Image
 
 from comments import captcha, queries, ratelimit
@@ -276,6 +277,14 @@ class RateLimitTests(TransactionTestCase):
             await graphql(query, headers={"X-Real-IP": "198.51.100.3"})
             payload = await graphql(query, headers={"X-Real-IP": "198.51.100.4"})
         self.assertNotIn("errors", payload)
+
+    @override_settings(RATE_LIMIT_EXEMPT=ipaddress.ip_network("198.51.100.0/28"))
+    async def test_load_machine_is_exempt(self):
+        address = {"X-Real-IP": "198.51.100.5"}
+        with mock.patch.object(ratelimit.comments, "limit", 1), mock.patch.object(ratelimit.captchas, "limit", 1):
+            for _ in range(2):
+                self.assertNotIn("errors", await graphql("mutation { issueCaptcha { key } }", headers=address))
+                self.assertNotIn("errors", await graphql(CREATE, {"input": form(**solved_captcha())}, address))
 
 
 class UploadTests(TransactionTestCase):

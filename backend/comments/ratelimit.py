@@ -4,8 +4,11 @@ cannot see which GraphQL operation a request carries.
 Only the event loop touches the counters, so they need no locks. They live in process
 memory: a restart only clears them.
 """
+import ipaddress
 import time
 from collections import OrderedDict
+
+from django.conf import settings
 
 WINDOW_SECONDS = 60
 COMMENTS_PER_WINDOW = 10
@@ -31,6 +34,17 @@ class RateLimiter:
             return True
         window[0] += 1
         return window[0] <= self.limit
+
+
+def is_exempt(address):
+    """Only the load machine of a load test (settings.RATE_LIMIT_EXEMPT)."""
+    network = settings.RATE_LIMIT_EXEMPT
+    if network is None or not address:
+        return False
+    try:
+        return ipaddress.ip_address(address) in network
+    except ValueError:
+        return False
 
 
 comments = RateLimiter(COMMENTS_PER_WINDOW)

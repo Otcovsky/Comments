@@ -9,8 +9,9 @@ COPY . .
 RUN npm run build
 
 FROM nginx:1.27-alpine
-# A template: nginx fills in ${MEDIA_BUCKET_URL} when the container starts.
-ENV MEDIA_BUCKET_URL=""
+# A template: nginx fills in ${MEDIA_BUCKET_URL} and ${RATE_LIMIT_EXEMPT} when the container starts.
+ENV MEDIA_BUCKET_URL="" \
+    RATE_LIMIT_EXEMPT=127.0.0.1/32
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80

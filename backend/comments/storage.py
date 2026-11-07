@@ -28,8 +28,13 @@ def _client():
     )
 
 
-def put(file):
+def put(file, key=None):
     """Stores a processed file and returns its key in the bucket."""
-    key = f"attachments/{timezone.now():%Y/%m}/{uuid.uuid4().hex}.{file.extension}"
+    key = key or f"attachments/{timezone.now():%Y/%m}/{uuid.uuid4().hex}.{file.extension}"
     _client().put_object(Bucket=settings.S3_BUCKET, Key=key, Body=file.content, ContentType=file.content_type)
     return key
+
+
+def delete(key):
+    # The bucket answers success for a key that is already gone.
+    _client().delete_object(Bucket=settings.S3_BUCKET, Key=key)

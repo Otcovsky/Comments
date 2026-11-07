@@ -1,0 +1,4 @@
+# Shell scripts run on Linux servers as they are, so they keep LF on every checkout.
+*.sh text eol=lf
+# Load test fixtures are sent byte for byte.
+perf/k6/fixtures/** -text

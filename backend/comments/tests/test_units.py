@@ -1,3 +1,4 @@
+import ipaddress
 from unittest import mock
 
 from django.test import SimpleTestCase, override_settings
@@ -115,6 +116,14 @@ class RateLimiterTests(SimpleTestCase):
                 limiter.allow(address)
         self.assertEqual(list(limiter._windows), ["b", "c"])
 
+    def test_exempt_network(self):
+        with override_settings(RATE_LIMIT_EXEMPT=ipaddress.ip_network("10.0.0.0/24")):
+            self.assertTrue(ratelimit.is_exempt("10.0.0.7"))
+            self.assertFalse(ratelimit.is_exempt("10.0.1.7"))
+            self.assertFalse(ratelimit.is_exempt("not an address"))
+            self.assertFalse(ratelimit.is_exempt(None))
+        self.assertFalse(ratelimit.is_exempt("10.0.0.7"))
+
 
 class CaptchaStoreTests(SimpleTestCase):
     def test_answer_ignores_case(self):
@@ -157,6 +166,13 @@ class CaptchaStoreTests(SimpleTestCase):
 
     def test_image_is_a_png_data_url(self):
         self.assertTrue(captcha.render("AbC12").startswith("data:image/png;base64,"))
+
+    @override_settings(CAPTCHA_TEST_ANSWER="PERF1")
+    async def test_answer_known_in_a_load_test_and_still_single_use(self):
+        key, image = await captcha.issue()
+        self.assertTrue(image.startswith("data:image/png;base64,"))
+        self.assertTrue(captcha.store.check(key, "PERF1"))
+        self.assertFalse(captcha.store.check(key, "PERF1"))
 
 
 @override_settings(AUTHOR_TOKEN_TTL=3600)

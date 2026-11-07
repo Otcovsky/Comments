@@ -1,3 +1,4 @@
+import ipaddress
 import os
 from pathlib import Path
 
@@ -46,6 +47,11 @@ FILE_THREADS = 2
 
 # Seconds a token from a solved captcha replaces the next captchas.
 AUTHOR_TOKEN_TTL = 3600
+
+# Load tests only, see perf/README.md; never set for real users. Every captcha gets this
+# answer, and clients from this network (the load machine) skip the limits per IP.
+CAPTCHA_TEST_ANSWER = os.environ.get("CAPTCHA_TEST_ANSWER", "")
+RATE_LIMIT_EXEMPT = ipaddress.ip_network(os.environ["RATE_LIMIT_EXEMPT"]) if os.environ.get("RATE_LIMIT_EXEMPT") else None
 
 S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "")
 S3_REGION = os.environ.get("S3_REGION", "")
