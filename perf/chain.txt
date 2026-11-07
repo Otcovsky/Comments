@@ -3,3 +3,4 @@
 # `python perf/compare.py --chain` сравнивает каждый прогон с предыдущим.
 # Цепочка версии 1 (старое приложение на REST) — в perf/history/OPTIMIZATIONS.md.
 # <папка в perf/results>  <что изменилось>
+2026-11-07_1209_baseline-v2  исходный код (baseline v2): GraphQL, один процесс Daphne, без кэша и брокера
