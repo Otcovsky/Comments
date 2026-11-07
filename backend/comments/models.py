@@ -28,6 +28,10 @@ class Comment(models.Model):
         TEXT = "text", "Текстовый файл"
 
     author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="comments")
+    # The author's pair, copied: the list sorts and counts by it, and only columns of this
+    # table can share an index with parent_id. The pair of an author never changes.
+    username = models.CharField(max_length=64)
+    email = models.EmailField()
     parent = models.ForeignKey(
         "self", null=True, blank=True, on_delete=models.CASCADE, related_name="replies"
     )
@@ -49,7 +53,18 @@ class Comment(models.Model):
         indexes = [
             models.Index(fields=["parent", "-created_at"]),
             models.Index(fields=["root", "created_at"]),
+            # Top-level comments by name and e-mail, ties to the newer id (queries.ORDERINGS),
+            # one index per direction: MySQL cannot read one index backwards for both.
+            models.Index(fields=["parent", "username", "-id"], name="comments_top_username_asc"),
+            models.Index(fields=["parent", "-username", "-id"], name="comments_top_username_desc"),
+            models.Index(fields=["parent", "email", "-id"], name="comments_top_email_asc"),
+            models.Index(fields=["parent", "-email", "-id"], name="comments_top_email_desc"),
         ]
 
     def __str__(self):
         return f"#{self.pk} by {self.author_id}"
+
+    def save(self, *args, **kwargs):
+        if not self.username:
+            self.username, self.email = self.author.username, self.author.email
+        super().save(*args, **kwargs)

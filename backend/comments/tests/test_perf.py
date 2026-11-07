@@ -26,6 +26,8 @@ class SeedTests(TransactionTestCase):
         self.assertEqual(
             sorted(Comment.objects.filter(parent__isnull=True).values_list("pk", flat=True)), [1, 2, 3, 4, 5]
         )
+        for comment in Comment.objects.select_related("author"):
+            self.assertEqual((comment.username, comment.email), (comment.author.username, comment.author.email))
         for reply in Comment.objects.filter(parent__isnull=False):
             self.assertEqual(reply.root_id, reply.parent.root_id or reply.parent_id)
             self.assertGreater(reply.created_at, reply.parent.created_at)

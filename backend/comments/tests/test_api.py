@@ -7,7 +7,9 @@ from unittest import mock
 from asgiref.sync import sync_to_async
 from botocore.exceptions import ClientError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import AsyncClient, TransactionTestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from PIL import Image
 
 from comments import captcha, live, queries, ratelimit
@@ -378,6 +380,23 @@ class TopLevelCountTests(TransactionTestCase):
 
 class PositionTests(TransactionTestCase):
     """The count behind the page of a live event must agree with the real order of the list."""
+
+    def test_comment_keeps_its_authors_pair(self):
+        comment = make_comment(make_author("ann", "ann@example.com"))
+        comment.refresh_from_db()
+        self.assertEqual((comment.username, comment.email), ("ann", "ann@example.com"))
+
+    def test_sorting_and_counting_by_name_need_no_author_table(self):
+        comment = make_comment(make_author())
+        for ordering in ("USERNAME_ASC", "USERNAME_DESC", "EMAIL_ASC", "EMAIL_DESC"):
+            with self.subTest(ordering=ordering), CaptureQueriesContext(connection) as captured:
+                queries.positions(comment.pk, [ordering])
+                queries.comment_page(1, 25, ordering)
+            # The positions and the ids of the page; only the page's own rows join authors.
+            sorting = [q["sql"] for q in captured.captured_queries if "home_page" not in q["sql"]]
+            self.assertTrue(sorting)
+            for sql in sorting:
+                self.assertNotIn("comments_author", sql)
 
     def test_position_matches_the_page_query(self):
         authors = [make_author(name, f"{name}@example.com") for name in ("ann", "Bob", "cid")]

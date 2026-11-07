@@ -21,6 +21,8 @@ CREATE TABLE `comments_author` (
 CREATE TABLE `comments_comment` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `author_id` BIGINT NOT NULL,
+  `username` VARCHAR(64) NOT NULL COMMENT 'Copy of comments_author.username, for sorting with an index',
+  `email` VARCHAR(254) NOT NULL COMMENT 'Copy of comments_author.email, for sorting with an index',
   `parent_id` BIGINT NULL COMMENT 'Comment this one replies to; NULL for top-level comments',
   `root_id` BIGINT NULL COMMENT 'Top-level comment of the thread; NULL for top-level comments',
   `text` LONGTEXT NOT NULL COMMENT 'Sanitized XHTML: only a, code, i, strong',
@@ -34,6 +36,10 @@ CREATE TABLE `comments_comment` (
   KEY `comments_comment_created_at_c684ddb5` (`created_at`),
   KEY `comments_co_parent__2efacb_idx` (`parent_id`, `created_at` DESC),
   KEY `comments_co_root_id_45b474_idx` (`root_id`, `created_at`),
+  KEY `comments_top_username_asc` (`parent_id`, `username`, `id` DESC),
+  KEY `comments_top_username_desc` (`parent_id`, `username` DESC, `id` DESC),
+  KEY `comments_top_email_asc` (`parent_id`, `email`, `id` DESC),
+  KEY `comments_top_email_desc` (`parent_id`, `email` DESC, `id` DESC),
   CONSTRAINT `comments_comment_author_id_334ce9e2_fk_comments_author_id` FOREIGN KEY (`author_id`) REFERENCES `comments_author` (`id`),
   CONSTRAINT `comments_comment_parent_id_3e0802fb_fk_comments_comment_id` FOREIGN KEY (`parent_id`) REFERENCES `comments_comment` (`id`),
   CONSTRAINT `comments_comment_root_id_23b4c218_fk_comments_comment_id` FOREIGN KEY (`root_id`) REFERENCES `comments_comment` (`id`)

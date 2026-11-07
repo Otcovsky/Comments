@@ -86,8 +86,9 @@ class Command(BaseCommand):
         self.wipe()
         pool = self.make_pool(rng, seed) if attachments else {}
         with transaction.atomic(), explicit_created_at():
-            Author.objects.bulk_create(self.make_authors(rng, authors), batch_size=2000)
-            comments = self.make_comments(rng, top, replies, authors)
+            people = self.make_authors(rng, authors)
+            Author.objects.bulk_create(people, batch_size=2000)
+            comments = self.make_comments(rng, top, replies, people)
             self.attach(rng, comments, pool, attachments)
             Comment.objects.bulk_create(comments, batch_size=2000)
         self.analyze()
@@ -226,9 +227,13 @@ class Command(BaseCommand):
         return comments
 
     def comment(self, rng, pk, authors, created_at):
+        # bulk_create skips Comment.save, so the author's pair is copied here.
+        author = authors[rng.randint(1, len(authors)) - 1]
         return Comment(
             pk=pk,
-            author_id=rng.randint(1, authors),
+            author_id=author.pk,
+            username=author.username,
+            email=author.email,
             text=self.text(rng),
             ip_address=f"10.{rng.randint(0, 255)}.{rng.randint(0, 255)}.{rng.randint(1, 254)}",
             user_agent=rng.choice(USER_AGENTS),
