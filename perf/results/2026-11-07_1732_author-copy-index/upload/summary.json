@@ -1,0 +1,138 @@
+{
+  "meta": {
+    "suite_version": 3,
+    "profile": "upload",
+    "rate": 2,
+    "duration": "90s",
+    "warmup": "15s",
+    "ws_clients": 0,
+    "ws_front": 0,
+    "viewers": 0,
+    "seed": 1,
+    "slo_p95_ms": 500,
+    "base_url": "http://10.0.0.122",
+    "mix": {
+      "attach": 1
+    },
+    "finished_at": "2026-11-07T15:43:17.714Z"
+  },
+  "passed": true,
+  "thresholds": {
+    "content_ok: rate>0.99": true,
+    "http_req_failed{phase:main}: rate<0.01": true,
+    "attach_ready: rate>0.99": true,
+    "http_req_duration{phase:main}: p(95)<500": true,
+    "http_req_failed{phase:media}: rate<0.01": true,
+    "http_req_failed{phase:live}: rate<0.01": true,
+    "api_ok: rate>0.99": true,
+    "dropped_iterations{scenario:attach}: count<1": true
+  },
+  "http": {
+    "requests_main": 362,
+    "requests_live": 0,
+    "failed_rate_live": 0,
+    "requests_total": 566,
+    "failed_rate_main": 0,
+    "duration_main": {
+      "avg": 42.449556723756906,
+      "med": 27.373442500000003,
+      "p90": 124.0211355,
+      "p95": 142.37271485,
+      "p99": 197.6399417699999,
+      "max": 275.964133,
+      "count": 362
+    },
+    "dropped_iterations": 0
+  },
+  "media": {
+    "requests": 181,
+    "failed_rate": 0,
+    "bytes": 14541
+  },
+  "endpoints": {
+    "list": null,
+    "thread": null,
+    "branch": null,
+    "captcha": {
+      "avg": 7.70977124309392,
+      "med": 7.193157,
+      "p90": 7.526079,
+      "p95": 8.104562,
+      "p99": 11.994741799999996,
+      "max": 75.736508,
+      "count": 181
+    },
+    "create": null,
+    "preview": null,
+    "attach": {
+      "avg": 77.18934220441986,
+      "med": 55.824045,
+      "p90": 142.405689,
+      "p95": 165.771249,
+      "p99": 227.17633139999998,
+      "max": 275.964133,
+      "count": 181
+    },
+    "reload": null,
+    "reload-thread": null,
+    "media": {
+      "avg": 31.89077630386741,
+      "med": 23.736202,
+      "p90": 40.88133,
+      "p95": 78.298121,
+      "p99": 190.92841739999997,
+      "max": 266.992327,
+      "count": 181
+    }
+  },
+  "failed_by_scenario": {
+    "attach": 0
+  },
+  "dropped_by_scenario": {
+    "attach": 0
+  },
+  "ws": {
+    "delivery": null,
+    "messages": 0,
+    "front_events": 0,
+    "errors": 0,
+    "sessions": 0,
+    "connecting": null
+  },
+  "api_ok": {
+    "rate": 1,
+    "count": 384
+  },
+  "content_ok": {
+    "rate": 1,
+    "count": 379
+  },
+  "fresh": {
+    "list": {
+      "rate": null,
+      "count": 0
+    },
+    "thread": {
+      "rate": null,
+      "count": 0
+    },
+    "visible": null
+  },
+  "attach_ready": {
+    "rate": 1,
+    "count": 181,
+    "time": {
+      "avg": 31.955801104972377,
+      "med": 24,
+      "p90": 41,
+      "p95": 79,
+      "p99": 190.59999999999997,
+      "max": 267,
+      "count": 181
+    }
+  },
+  "comments_created": 181,
+  "comments_created_top": 94,
+  "data_received_bytes": 10541403,
+  "checks_rate": 1
+}

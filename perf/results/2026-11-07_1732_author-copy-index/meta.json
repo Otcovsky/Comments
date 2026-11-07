@@ -1,0 +1,12 @@
+{
+  "label": "author-copy-index",
+  "mode": "suite",
+  "suite_version": 3,
+  "started_at": "2026-11-07T15:32:50Z",
+  "local_git_sha": "20e527f5f620c3c647edd1d2670f5901c1ddb9d3",
+  "local_git_dirty_files": 0,
+  "app": {"git_sha": "20e527f5f620c3c647edd1d2670f5901c1ddb9d3", "git_dirty_files": null, "images": [{"ID":"sha256:a96c01d489fc4cf7f2cf2c13a5bb288e81dbae47650cc5834294efce233d0625","ContainerName":"comments-backend-1","Repository":"comments-backend","Tag":"latest","Platform":"linux/arm64","Size":173127950,"LastTagTime":"2026-11-07T15:32:28.362007547Z"},{"ID":"sha256:a2287ea81746768a60090faa364fc14f55a84e5504273752faa5c2c211255a57","ContainerName":"comments-frontend-1","Repository":"comments-frontend","Tag":"latest","Platform":"linux/arm64","Size":22121173,"LastTagTime":"2026-11-07T15:32:29.050239354Z"}]},
+  "k6": "k6 v2.3.0 (commit/e088784614, go1.26.8, linux/arm64)",
+  "seed_args": "--top 10000 --replies 50000 --authors 2000 --seed 42",
+  "env_overrides": ""
+}
