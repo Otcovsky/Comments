@@ -1,0 +1,202 @@
+{
+  "meta": {
+    "suite_version": 3,
+    "profile": "load",
+    "rate": 64,
+    "duration": "40s",
+    "warmup": "10s",
+    "ws_clients": 50,
+    "ws_front": 25,
+    "viewers": 0,
+    "seed": 1,
+    "slo_p95_ms": 500,
+    "base_url": "http://10.0.0.122",
+    "mix": {
+      "list": 0.6,
+      "thread": 0.25,
+      "write": 0.1,
+      "preview": 0.03,
+      "attach": 0.02
+    },
+    "finished_at": "2026-11-08T11:02:14.426Z"
+  },
+  "passed": true,
+  "thresholds": {
+    "dropped_iterations{scenario:attach}: count<1": true,
+    "http_req_failed{phase:main}: rate<0.01": true,
+    "dropped_iterations{scenario:list}: count<1": true,
+    "attach_ready: rate>0.99": true,
+    "http_req_duration{phase:main}: p(95)<500": true,
+    "http_req_failed{phase:live}: rate<0.01": true,
+    "api_ok: rate>0.99": true,
+    "dropped_iterations{scenario:preview}: count<1": true,
+    "dropped_iterations{scenario:thread}: count<1": true,
+    "dropped_iterations{scenario:write}: count<1": true,
+    "http_req_failed{phase:media}: rate<0.01": true,
+    "content_ok: rate>0.99": true
+  },
+  "http": {
+    "requests_main": 2900,
+    "requests_live": 0,
+    "failed_rate_live": 0,
+    "requests_total": 3518,
+    "failed_rate_main": 0,
+    "duration_main": {
+      "avg": 18.13437476620689,
+      "med": 13.671669,
+      "p90": 25.781883900000004,
+      "p95": 37.26547604999998,
+      "p99": 115.41316389999994,
+      "max": 379.338813,
+      "count": 2900
+    },
+    "dropped_iterations": 0
+  },
+  "media": {
+    "requests": 203,
+    "failed_rate": 0,
+    "bytes": 4803946
+  },
+  "endpoints": {
+    "list": {
+      "avg": 18.428757882888743,
+      "med": 15.263758,
+      "p90": 26.692680000000003,
+      "p95": 35.42587619999999,
+      "p99": 82.21092815999994,
+      "max": 164.249157,
+      "count": 1537
+    },
+    "thread": {
+      "avg": 12.241259246489864,
+      "med": 10.119132,
+      "p90": 16.909166,
+      "p95": 22.612076,
+      "p99": 65.4949501999999,
+      "max": 115.391149,
+      "count": 641
+    },
+    "branch": {
+      "avg": 12.071469037037037,
+      "med": 11.351698,
+      "p90": 16.3856034,
+      "p95": 18.927847899999996,
+      "p99": 32.75832686,
+      "max": 37.25739,
+      "count": 27
+    },
+    "captcha": {
+      "avg": 15.33461241423946,
+      "med": 12.752745,
+      "p90": 20.755098200000003,
+      "p95": 24.984775199999994,
+      "p99": 92.31707559999984,
+      "max": 135.300969,
+      "count": 309
+    },
+    "create": {
+      "avg": 16.91481725291829,
+      "med": 14.676075,
+      "p90": 25.926348,
+      "p95": 32.110027599999995,
+      "p99": 44.40311923999998,
+      "max": 73.312934,
+      "count": 257
+    },
+    "preview": {
+      "avg": 6.181467987012987,
+      "med": 5.298267,
+      "p90": 11.2684818,
+      "p95": 12.230998199999998,
+      "p99": 13.986532599999997,
+      "max": 17.002927,
+      "count": 77
+    },
+    "attach": {
+      "avg": 125.58909250000002,
+      "med": 82.8854025,
+      "p90": 230.573471,
+      "p95": 271.7217095,
+      "p99": 350.48111172,
+      "max": 379.338813,
+      "count": 52
+    },
+    "reload": null,
+    "reload-thread": null,
+    "media": {
+      "avg": 21.353336251231525,
+      "med": 1.102925,
+      "p90": 60.600332800000025,
+      "p95": 87.5825344,
+      "p99": 196.30832089999998,
+      "max": 465.919335,
+      "count": 203
+    }
+  },
+  "failed_by_scenario": {
+    "list": 0,
+    "thread": 0,
+    "write": 0,
+    "preview": 0,
+    "attach": 0
+  },
+  "dropped_by_scenario": {
+    "list": 0,
+    "thread": 0,
+    "write": 0,
+    "preview": 0,
+    "attach": 0
+  },
+  "ws": {
+    "delivery": null,
+    "messages": 4365,
+    "front_events": 3950,
+    "errors": 0,
+    "sessions": 50,
+    "connecting": {
+      "avg": 162.42041434,
+      "med": 134.79774700000002,
+      "p90": 222.4367463,
+      "p95": 229.89267999999998,
+      "p99": 276.76232531999995,
+      "max": 318.325023,
+      "count": 50
+    }
+  },
+  "api_ok": {
+    "rate": 1,
+    "count": 3309
+  },
+  "content_ok": {
+    "rate": 1,
+    "count": 2997
+  },
+  "fresh": {
+    "list": {
+      "rate": null,
+      "count": 0
+    },
+    "thread": {
+      "rate": null,
+      "count": 0
+    },
+    "visible": null
+  },
+  "attach_ready": {
+    "rate": 1,
+    "count": 52,
+    "time": {
+      "avg": 45.17307692307692,
+      "med": 29.5,
+      "p90": 94.30000000000001,
+      "p95": 125.49999999999989,
+      "p99": 173.25,
+      "max": 186,
+      "count": 52
+    }
+  },
+  "comments_created": 309,
+  "comments_created_top": 158,
+  "data_received_bytes": 28742293,
+  "checks_rate": 1
+}
