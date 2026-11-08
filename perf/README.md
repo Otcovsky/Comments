@@ -4,8 +4,8 @@
 
 ```
  ваш компьютер (Git Bash)          loadtest (k6)                 oracle-comments (Docker)
- perf/run.sh ── ssh ─────────────▶ k6 run main.js ── HTTP/WS ──▶ nginx ─▶ daphne ─▶ MySQL HeatWave
-     │                             vmstat                  (приватная сеть 10.0.0.0/24)  └─▶ Object Storage
+ perf/run.sh ── ssh ─────────────▶ k6 run main.js ── HTTP/WS ──▶ nginx ─▶ uvicorn ─▶ MySQL HeatWave
+     │                             vmstat                  (приватная сеть 10.0.0.0/24)   └─▶ Object Storage
      └── ssh: perf_reset, рестарт сервисов, docker stats, vmstat, perf_db_status
 ```
 
