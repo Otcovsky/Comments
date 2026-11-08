@@ -26,6 +26,10 @@ services:
       # Processes of uvicorn: one per core of the server. BACKEND_WORKERS=1 in the env file
       # brings back a single process, for comparison.
       WEB_CONCURRENCY: ${BACKEND_WORKERS:-2}
+    # Every open tab holds a socket, and Docker's default of 1024 files per process would
+    # stop a process at about a thousand of them.
+    ulimits:
+      nofile: 65536
     depends_on:
       redis:
         condition: service_healthy
@@ -63,6 +67,9 @@ services:
       RATE_LIMIT_EXEMPT: ${RATE_LIMIT_EXEMPT:-127.0.0.1/32}
     ports:
       - "${HTTP_PORT:-80}:80"
+    # A WebSocket takes two connections in nginx, to the browser and to the backend.
+    ulimits:
+      nofile: 65536
     depends_on:
       - backend
     restart: unless-stopped

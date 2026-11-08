@@ -8,6 +8,7 @@
 #   perf/run.sh soak  <label> [rate]           # fixed rate, 30 minutes
 #   perf/run.sh upload <label> [rate]          # only uploads with attachments, 3 minutes
 #   perf/run.sh step  <label> [rate...]        # STEP_DURATION per rate until the SLO breaks
+#   perf/run.sh day   <label> [rate]           # peak hour of 100k visitors a day (docs/scaling.md)
 #
 # Outside the suite, k6 variables can be overridden from the environment, e.g. DURATION=2m.
 set -euo pipefail
@@ -22,11 +23,11 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 MODE=${1:-}
 LABEL=${2:-$MODE}
 case "$MODE" in
-suite | smoke | load | soak | step | upload) ;;
-*) sed -n '2,12p' "$0" >&2; exit 2 ;;
+suite | smoke | load | soak | step | upload | day) ;;
+*) sed -n '2,13p' "$0" >&2; exit 2 ;;
 esac
 
-OVERRIDES=$(env | grep -E '^(DURATION|WARMUP|WS_CLIENTS|VIEWERS|RATE|SLO_P95|SEED|USE_TOKEN)=' | tr '\n' ' ' || true)
+OVERRIDES=$(env | grep -E '^(DURATION|WARMUP|WS_CLIENTS|VIEWERS|WS_PER_VU|RATE|SLO_P95|SEED|USE_TOKEN)=' | tr '\n' ' ' || true)
 if [ "$MODE" = suite ] && [ -n "$OVERRIDES" ]; then
     echo "The suite runs with fixed settings; unset: $OVERRIDES" >&2
     exit 2
@@ -93,11 +94,12 @@ run_once() {
     local vars="-e PROFILE=$profile -e RATE=$rate -e BASE_URL=$BASE_URL -e HOST_HEADER=$HOST_HEADER"
     vars+=" -e TOP=$TOP -e TOTAL=$TOTAL -e SLO_P95=${SLO_P95:-500} -e CAPTCHA_ANSWER=$CAPTCHA_ANSWER"
     vars+=" -e SUMMARY_OUT=../out/summary.json"
-    for name in DURATION WARMUP WS_CLIENTS VIEWERS SEED USE_TOKEN; do
+    for name in DURATION WARMUP WS_CLIENTS VIEWERS WS_PER_VU SEED USE_TOKEN; do
         [ -n "${!name:-}" ] && vars+=" -e $name=${!name}"
     done
-    # vmstat on the load machine shows whether k6 itself ran out of CPU.
-    load "cd ~/perf/k6 && rm -f ../out/* && { TZ=UTC vmstat -n -t 2 > ../out/vmstat.txt & }; v=\$!;
+    # vmstat on the load machine shows whether k6 itself ran out of CPU. Every socket is a
+    # file, and the default limit of 1024 would stop k6 at about a thousand connections.
+    load "ulimit -n \$(ulimit -Hn) && cd ~/perf/k6 && rm -f ../out/* && { TZ=UTC vmstat -n -t 2 > ../out/vmstat.txt & }; v=\$!;
         k6 run --quiet --no-color $vars main.js; c=\$?; kill \$v; exit \$c" || code=$?
 
     app stats-stop
@@ -153,6 +155,7 @@ suite)
 smoke) run_once "$RUN_DIR" "${RATE:-2}" smoke ;;
 load | soak) VIEWERS=${VIEWERS:-$LOAD_VIEWERS} run_once "$RUN_DIR" "${3:-${RATE:-$LOAD_RATE}}" "$MODE" ;;
 upload) run_once "$RUN_DIR" "${3:-${RATE:-$UPLOAD_RATE}}" upload ;;
+day) run_once "$RUN_DIR" "${3:-${RATE:-23}}" day ;;
 step)
     set -- "${@:3}"
     # shellcheck disable=SC2086
