@@ -21,11 +21,34 @@ services:
     env_file: ../comments.env
     environment:
       REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: &broker_url amqp://${RABBITMQ_USER:-comments}:${RABBITMQ_PASSWORD}@broker:5672//
       # Processes of uvicorn: one per core of the server. BACKEND_WORKERS=1 in the env file
       # brings back a single process, for comparison.
       WEB_CONCURRENCY: ${BACKEND_WORKERS:-2}
     depends_on:
       redis:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Celery: the events of new comments and the deletes of orphaned files (comments/tasks.py).
+  # Two processes, as many as the cores; most of a task is waiting for MySQL and Redis.
+  worker:
+    image: comments-backend
+    command: >-
+      celery -A config worker --concurrency 2 --loglevel WARNING
+      --without-gossip --without-mingle --without-heartbeat
+    env_file: ../comments.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: *broker_url
+    depends_on:
+      redis:
+        condition: service_healthy
+      broker:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -57,7 +80,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # The Celery task queue. Nothing uses it yet.
+  # The Celery task queue.
   broker:
     image: rabbitmq:4.1-alpine
     # RabbitMQ keeps its data under the node name, which comes from the host name.

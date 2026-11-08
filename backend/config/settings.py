@@ -57,6 +57,20 @@ CHANNEL_LAYERS = {
         "CONFIG": {"hosts": [{"address": REDIS_URL, **REDIS_OPTIONS}]},
     }
 }
+# The Celery task queue in RabbitMQ (comments/tasks.py). A task's result is not kept, and a
+# task is acknowledged once it ran, so one lost with its worker runs again: both tasks may run
+# twice. A publish that fails is not retried for long: the caller has its own way out.
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "amqp://guest:guest@broker:5672//")
+CELERY_BROKER_CONNECTION_TIMEOUT = 2
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_PUBLISH_RETRY_POLICY = {"max_retries": 1, "interval_start": 0, "interval_step": 0.2}
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SOFT_TIME_LIMIT = 30
+# No broadcast queues for remote control: nothing here sends commands to the workers.
+CELERY_WORKER_ENABLE_REMOTE_CONTROL = False
 # Redis outlives a test run, so the runner empties it first.
 TEST_RUNNER = "comments.tests.runner.Runner"
 
@@ -89,4 +103,6 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": "INFO"},
+    # A line per finished task, like an access log.
+    "loggers": {"celery.app.trace": {"level": "WARNING"}},
 }

@@ -12,7 +12,7 @@ from django.test import AsyncClient, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from PIL import Image
 
-from comments import cache, captcha, live, queries, ratelimit, shared
+from comments import cache, captcha, live, queries, ratelimit, shared, tasks
 from comments.models import Author, Comment
 
 from .helpers import (
@@ -340,6 +340,21 @@ class UploadTests(TransactionTestCase):
             payload = await self.send("a.txt", b"hello")
         self.assertIn("attachment", error_of(payload)["fields"])
         self.assertEqual(await Comment.objects.acount(), 0)
+
+    async def test_file_of_a_comment_not_saved_is_deleted(self):
+        failure = RuntimeError("database down")
+        with self.bucket() as client, mock.patch.object(queries, "save_comment", side_effect=failure):
+            with self.assertLogs("strawberry.execution", "ERROR"):
+                payload = await self.send("a.txt", b"hello")
+        self.assertIsNone(payload["data"])
+        key = client.return_value.put_object.call_args.kwargs["Key"]
+        client.return_value.delete_object.assert_called_once_with(Bucket=mock.ANY, Key=key)
+
+    def test_delete_of_an_orphan_is_retried(self):
+        failure = ClientError({"Error": {"Code": "500", "Message": "x"}}, "DeleteObject")
+        with self.bucket(**{"delete_object.side_effect": [failure, None]}) as client:
+            tasks.delete_attachment.delay("attachments/2026/11/x.txt")
+        self.assertEqual(client.return_value.delete_object.call_count, 2)
 
     async def test_file_is_not_touched_when_the_form_is_wrong(self):
         with self.bucket() as client:

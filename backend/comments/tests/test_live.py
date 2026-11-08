@@ -4,8 +4,9 @@ from unittest import mock
 
 from channels.testing import WebsocketCommunicator
 from django.test import TransactionTestCase
+from kombu.exceptions import OperationalError
 
-from comments import live, queries
+from comments import live, queries, shared, tasks
 from comments.live import viewers
 from comments.routing import websocket_urlpatterns
 
@@ -189,6 +190,23 @@ class SocketTests(TransactionTestCase):
             await self.show(socket)  # the first page now, written nowhere
         await viewers.sweep()  # the next heartbeat
         comment = await post()
+        self.assertEqual((await socket.receive_json_from())["id"], comment["id"])
+        await self.close()
+
+    async def test_events_go_through_the_queue(self):
+        socket = await self.connect()
+        with mock.patch.object(tasks.send_events, "delay", wraps=tasks.send_events.delay) as queued:
+            comment = await post()
+        queued.assert_called_once_with({"id": int(comment["id"]), "root_id": None}, None)
+        self.assertEqual((await socket.receive_json_from())["id"], comment["id"])
+        await self.close()
+
+    async def test_without_the_broker_this_process_sends_the_events(self):
+        socket = await self.connect()
+        shared._warned.clear()
+        failure = OperationalError("broker down")
+        with mock.patch.object(tasks.send_events, "delay", side_effect=failure), self.assertLogs("comments.live", "WARNING"):
+            comment = await post()
         self.assertEqual((await socket.receive_json_from())["id"], comment["id"])
         await self.close()
 

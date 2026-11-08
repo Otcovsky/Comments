@@ -1,4 +1,5 @@
 from comments import shared
+from config.celery import app as celery_app
 
 from .seed_perf import Command as SeedCommand
 
@@ -11,8 +12,9 @@ class Command(SeedCommand):
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        # Everything Redis keeps (captchas, limits, viewports, the cached comments)
-        # goes too, or the run starts warm. perf/remote/app.sh then restarts every service, and
-        # anything added later that outlives a restart (a task queue, a search index) must be
-        # emptied here as well.
+        # Everything Redis keeps (captchas, limits, viewports, the cached comments) and the
+        # tasks still queued in RabbitMQ go too, or the run starts warm. perf/remote/app.sh then
+        # restarts every service, and anything added later that outlives a restart (a search
+        # index) must be emptied here as well.
         shared.client().flushdb()
+        celery_app.control.purge()

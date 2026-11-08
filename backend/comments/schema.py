@@ -12,7 +12,7 @@ from strawberry.extensions import MaskErrors, MaxAliasesLimiter, MaxTokensLimite
 from strawberry.file_uploads import Upload
 from strawberry.types import Info
 
-from . import attachments, captcha, live, queries, ratelimit, shared, storage, tokens, validation
+from . import attachments, captcha, live, queries, ratelimit, shared, storage, tasks, tokens, validation
 from .errors import ApiError
 from .models import Comment as CommentModel
 from .pools import in_db_thread, in_file_thread
@@ -219,18 +219,24 @@ class Mutation:
 
         path, kind = await _save_attachment(attachment) if attachment else ("", CommentModel.AttachmentType.NONE)
 
-        row = await in_db_thread(
-            queries.save_comment,
-            username=username,
-            email=email,
-            home_page=home_page,
-            parent=parent,
-            text=text,
-            attachment=path,
-            attachment_type=kind,
-            ip_address=_client_address(request),
-            user_agent=request.headers.get("User-Agent", "")[:255],
-        )
+        try:
+            row = await in_db_thread(
+                queries.save_comment,
+                username=username,
+                email=email,
+                home_page=home_page,
+                parent=parent,
+                text=text,
+                attachment=path,
+                attachment_type=kind,
+                ip_address=_client_address(request),
+                user_agent=request.headers.get("User-Agent", "")[:255],
+            )
+        except Exception:
+            # The file is in the bucket, but no comment links to it.
+            if path:
+                await tasks.delete_attachment_later(path)
+            raise
         live.comment_created_later(row, parent)
 
         return CreateCommentResult(
