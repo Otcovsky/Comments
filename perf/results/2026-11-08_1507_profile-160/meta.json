@@ -1,0 +1,12 @@
+{
+  "label": "profile-160",
+  "mode": "step",
+  "suite_version": 3,
+  "started_at": "2026-11-08T13:07:51Z",
+  "local_git_sha": "5eb3fe6b762d5fd8e07a0a178d1abd50f945ab02",
+  "local_git_dirty_files": 0,
+  "app": {"git_sha": "09bcfa1308a8c5d8e82341959dc53c020feff27b", "git_dirty_files": null, "images": [{"ID":"sha256:fe9daae35cd4fd6ec22416aa4fe0cf6b3e36741e06ff45b9986253fe2a81c041","ContainerName":"comments-redis-1","Repository":"redis","Tag":"8.2-alpine","Platform":"linux/arm64/v8","Size":27881486,"LastTagTime":"2026-11-08T10:22:23.216743609Z"},{"ID":"sha256:425307007e5a54b20fe6b6da718c2e385999eddda28d44d329b7e7bfabe45610","ContainerName":"comments-broker-1","Repository":"rabbitmq","Tag":"4.1-alpine","Platform":"linux/arm64/v8","Size":82203201,"LastTagTime":"2026-11-08T10:22:26.917096943Z"},{"ID":"sha256:308fc8d3ae11583b97d236c45a82100bf9f4b84ab7e067333ceb500e54f85951","ContainerName":"comments-backend-1","Repository":"comments-backend","Tag":"latest","Platform":"linux/arm64","Size":182720798,"LastTagTime":"2026-11-08T12:48:51.959141443Z"},{"ID":"sha256:308fc8d3ae11583b97d236c45a82100bf9f4b84ab7e067333ceb500e54f85951","ContainerName":"comments-migrate-1","Repository":"comments-backend","Tag":"latest","Platform":"linux/arm64","Size":182720798,"LastTagTime":"2026-11-08T12:48:51.959141443Z"},{"ID":"sha256:2fac4d62a6d5510ce754fbdcaa42de5fdca4a02a18394f05c902ba32e078c0fc","ContainerName":"comments-frontend-1","Repository":"comments-frontend","Tag":"latest","Platform":"linux/arm64","Size":22121173,"LastTagTime":"2026-11-08T12:48:52.881006243Z"}]},
+  "k6": "k6 v2.3.0 (commit/e088784614, go1.26.8, linux/arm64)",
+  "seed_args": "--top 10000 --replies 50000 --authors 2000 --seed 42",
+  "env_overrides": "DURATION=80s "
+}
