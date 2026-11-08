@@ -1,14 +1,15 @@
 """Who sees what, and which events reach them; see docs/api.md, section 6.
 
-Who sees what lives in Redis, so that an event from any backend process finds the tables of
-all of them. A process that dies cannot drop its tables, so every process sends heartbeats,
-and the others drop the tables of one that stopped.
+Every open page is a group of the channel layer, so an event for it is one message whatever
+the number of processes and sockets. Which page sizes are open lives in Redis, so that an
+event from any backend process counts positions for the tables of all of them. A process that
+dies cannot drop its tables, so every process sends heartbeats, and the others drop the
+tables of one that stopped.
 """
 import asyncio
 import logging
 import uuid
 
-from channels.exceptions import ChannelFull
 from channels.layers import get_channel_layer
 
 from . import queries, shared
@@ -31,14 +32,17 @@ def branch_group(comment_id):
     return f"branch.{comment_id}"
 
 
+def page_group(ordering, page_size, page):
+    return f"page.{ordering}.{page_size}.{page}"
+
+
 # The keys, kept consistent by the scripts below:
-#   viewers:table:<ordering>:<size>:<page>  channels showing that page
-#   viewers:sizes                           "<ordering>:<size>" -> channels showing a page of it
-#   viewers:of:<process>                    channel -> its table, "<ordering>:<size>:<page>"
-#   viewers:alive:<process>                 exists while the process sends heartbeats
-#   viewers:processes                       processes that may have tables
-# The keys of a table are found from what the scripts read, so they work on a single Redis
-# only, not on a cluster.
+#   viewers:sizes            "<ordering>:<size>" -> channels showing a page of it
+#   viewers:of:<process>     channel -> its table, "<ordering>:<size>:<page>"
+#   viewers:alive:<process>  exists while the process sends heartbeats
+#   viewers:processes        processes that may have tables
+# The scripts build key names from what they read, so they work on a single Redis only, not
+# on a cluster.
 _DROP = """
 local function drop(process, channel)
     local of = 'viewers:of:' .. process
@@ -47,7 +51,6 @@ local function drop(process, channel)
         return
     end
     redis.call('HDEL', of, channel)
-    redis.call('SREM', 'viewers:table:' .. tbl, channel)
     local size = string.match(tbl, '^(.+):%d+$')
     if redis.call('HINCRBY', 'viewers:sizes', size, -1) <= 0 then
         redis.call('HDEL', 'viewers:sizes', size)
@@ -58,7 +61,6 @@ SHOW = _DROP + """
 local process, channel, tbl, ttl = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
 drop(process, channel)
 redis.call('HSET', 'viewers:of:' .. process, channel, tbl)
-redis.call('SADD', 'viewers:table:' .. tbl, channel)
 redis.call('HINCRBY', 'viewers:sizes', string.match(tbl, '^(.+):%d+$'), 1)
 redis.call('SADD', 'viewers:processes', process)
 redis.call('SET', 'viewers:alive:' .. process, 1, 'EX', ttl)
@@ -105,13 +107,6 @@ class Viewers:
             ordering, page_size = size.rsplit(":", 1)
             sizes.setdefault(ordering, set()).add(int(page_size))
         return sizes
-
-    async def channels(self, tables):
-        """The channels of each (ordering, page size, page), in one round trip."""
-        async with shared.aclient().pipeline(transaction=False) as pipe:
-            for ordering, page_size, page in tables:
-                pipe.smembers(f"viewers:table:{ordering}:{page_size}:{page}")
-            return await pipe.execute()
 
     async def sweep(self):
         """Says this process is alive and drops the tables of processes that are not."""
@@ -192,20 +187,11 @@ async def _send_to_page(comment_id, payload, newest=False):
     counted = [ordering for ordering in sizes if ordering not in positions]
     if counted:
         positions.update(await in_db_thread(queries.positions, comment_id, counted))
-    tables = [
-        (ordering, page_size, positions[ordering] // page_size + 1)
-        for ordering, page_sizes in sizes.items()
-        for page_size in page_sizes
-    ]
     layer = get_channel_layer()
     message = {"type": EVENT_HANDLER, "payload": payload}
-    for channels in await viewers.channels(tables):
-        for channel in channels:
-            try:
-                await layer.send(channel, message)
-            except ChannelFull:
-                # A client too slow to read loses this event, as after a dropped connection.
-                logger.warning("Channel is full, event dropped")
+    for ordering, page_sizes in sizes.items():
+        for page_size in page_sizes:
+            await layer.group_send(page_group(ordering, page_size, positions[ordering] // page_size + 1), message)
 
 
 async def _send_to_branch(comment_id, payload):

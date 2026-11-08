@@ -2,8 +2,6 @@
 import json
 from unittest import mock
 
-from channels.exceptions import ChannelFull
-from channels.layers import get_channel_layer
 from channels.testing import WebsocketCommunicator
 from django.test import TransactionTestCase
 
@@ -66,6 +64,14 @@ class SocketTests(TransactionTestCase):
             comment = await post()
         for socket in (newest, last_page):
             self.assertEqual((await socket.receive_json_from())["id"], comment["id"])
+        await self.close()
+
+    async def test_every_socket_of_a_page_hears(self):
+        first, second = await self.connect(), await self.connect()
+        comment = await post()
+        for socket in (first, second):
+            self.assertEqual((await socket.receive_json_from())["id"], comment["id"])
+            self.assertTrue(await socket.receive_nothing(QUIET))
         await self.close()
 
     async def test_third_page_hears_nothing(self):
@@ -176,20 +182,6 @@ class SocketTests(TransactionTestCase):
         self.sockets.clear()
         self.assertEqual(await viewers.page_sizes(), {})
         await post()  # nobody watches, and nothing breaks
-
-    async def test_full_channel_is_not_an_error(self):
-        socket = await self.connect()
-        layer = get_channel_layer()
-        send = layer.send
-
-        async def full(channel, message):
-            raise ChannelFull()
-
-        layer.send = full
-        with self.assertLogs("comments.live", "WARNING"):
-            await post()
-        layer.send = send
-        await self.close()
 
     async def test_broken_events_do_not_fail_the_comment(self):
         socket = await self.connect()

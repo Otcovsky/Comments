@@ -246,9 +246,6 @@ class ViewersTests(SimpleTestCase):
         viewers = Viewers("p1")
         await viewers.show("a", "CREATED_AT_DESC", 25, 1)
         await viewers.show("a", "EMAIL_ASC", 10, 2)
-        self.assertEqual(
-            await viewers.channels([("CREATED_AT_DESC", 25, 1), ("EMAIL_ASC", 10, 2)]), [set(), {"a"}]
-        )
         self.assertEqual(await viewers.page_sizes(), {"EMAIL_ASC": {10}})
 
     async def test_drop(self):
@@ -267,7 +264,8 @@ class ViewersTests(SimpleTestCase):
         await two.show("b", "CREATED_AT_DESC", 25, 1)
         await two.show("c", "EMAIL_ASC", 10, 1)
         self.assertEqual(await one.page_sizes(), {"CREATED_AT_DESC": {25}, "EMAIL_ASC": {10}})
-        self.assertEqual(await one.channels([("CREATED_AT_DESC", 25, 1)]), [{"a", "b"}])
+        await one.drop("a")
+        self.assertEqual(await one.page_sizes(), {"CREATED_AT_DESC": {25}, "EMAIL_ASC": {10}})
 
     async def test_tables_of_a_stopped_process_are_dropped(self):
         alive, stopped = Viewers("alive"), Viewers("stopped")
@@ -280,5 +278,6 @@ class ViewersTests(SimpleTestCase):
         with self.assertLogs("comments.live", "INFO"):
             await alive.sweep()
         self.assertEqual(await alive.page_sizes(), {"CREATED_AT_DESC": {25}})
-        self.assertEqual(await alive.channels([("CREATED_AT_DESC", 25, 1)]), [{"a"}])
+        await alive.drop("a")
+        self.assertEqual(await alive.page_sizes(), {})
         self.assertEqual(await shared.aclient().smembers("viewers:processes"), {"alive"})

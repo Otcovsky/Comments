@@ -38,7 +38,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # What every backend process must see the same way: captchas, limits per IP, viewports,
 # the count of top-level comments (comments/shared.py) and the channel layer.
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
-CHANNEL_LAYERS = {"default": {"BACKEND": "channels_redis.core.RedisChannelLayer", "CONFIG": {"hosts": [REDIS_URL]}}}
+# Pub/sub: an event for a group is one PUBLISH, and each process hands it to its own sockets.
+# The list-based RedisChannelLayer queues every message of a process in one list of 100, which
+# overflowed under load and lost events, and costs a round trip per message to receive.
+CHANNEL_LAYERS = {
+    "default": {"BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer", "CONFIG": {"hosts": [REDIS_URL]}}
+}
 # Redis outlives a test run, so the runner empties it first.
 TEST_RUNNER = "comments.tests.runner.Runner"
 

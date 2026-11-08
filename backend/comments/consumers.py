@@ -2,7 +2,7 @@ import json
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-from .live import branch_group, parse_viewport, viewers
+from .live import branch_group, page_group, parse_viewport, viewers
 
 MAX_MESSAGE_CHARS = 32 * 1024  # 200 branches fit several times over
 
@@ -11,7 +11,7 @@ class CommentsConsumer(AsyncWebsocketConsumer):
     """An anonymous client reports what is on its screen and gets events about that zone."""
 
     async def connect(self):
-        self.branch_groups = set()
+        self.joined = set()
         await self.accept()
 
     async def disconnect(self, code):
@@ -30,14 +30,15 @@ class CommentsConsumer(AsyncWebsocketConsumer):
             return
         ordering, page_size, page, branch_ids = viewport
         await viewers.show(self.channel_name, ordering, page_size, page)
-        await self._join_groups({branch_group(branch_id) for branch_id in branch_ids})
+        groups = {page_group(ordering, page_size, page)} | {branch_group(branch_id) for branch_id in branch_ids}
+        await self._join_groups(groups)
 
     async def _join_groups(self, groups):
-        for group in groups - self.branch_groups:
+        for group in groups - self.joined:
             await self.channel_layer.group_add(group, self.channel_name)
-        for group in self.branch_groups - groups:
+        for group in self.joined - groups:
             await self.channel_layer.group_discard(group, self.channel_name)
-        self.branch_groups = groups
+        self.joined = groups
 
     async def comment_event(self, event):
         await self.send(text_data=json.dumps(event["payload"]))
