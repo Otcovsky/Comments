@@ -19,4 +19,5 @@ EXPOSE 8000
 # WEB_CONCURRENCY processes (docker-compose.yml); what they share lives in Redis
 # (comments/shared.py). Migrations run once, in the migrate service, not in every process.
 # Channels has no lifespan handler. Open WebSockets would hold a shutdown until Docker kills it.
-CMD ["uvicorn", "config.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--lifespan", "off", "--timeout-graceful-shutdown", "5"]
+# nginx already logs every request; uvicorn's own line per response cost 2.5% of the CPU.
+CMD ["uvicorn", "config.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--lifespan", "off", "--timeout-graceful-shutdown", "5", "--no-access-log"]
