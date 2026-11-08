@@ -11,7 +11,7 @@ class Command(SeedCommand):
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        # Everything Redis keeps (captchas, limits, viewports, the count of top-level comments)
+        # Everything Redis keeps (captchas, limits, viewports, the cached comments)
         # goes too, or the run starts warm. perf/remote/app.sh then restarts every service, and
         # anything added later that outlives a restart (a task queue, a search index) must be
         # emptied here as well.
