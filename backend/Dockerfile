@@ -16,5 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 EXPOSE 8000
-# One process for now. What processes must share lives in Redis (comments/shared.py).
-CMD ["sh", "-c", "python manage.py migrate --noinput && exec daphne -b 0.0.0.0 -p 8000 config.asgi:application"]
+# WEB_CONCURRENCY processes (docker-compose.yml); what they share lives in Redis
+# (comments/shared.py). Migrations run once, in the migrate service, not in every process.
+# Channels has no lifespan handler. Open WebSockets would hold a shutdown until Docker kills it.
+CMD ["uvicorn", "config.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--lifespan", "off", "--timeout-graceful-shutdown", "5"]

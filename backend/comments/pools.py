@@ -1,6 +1,7 @@
 """Threads for blocking work: the event loop serves every socket, so it must stay free."""
 import asyncio
 import logging
+import os
 import threading
 import time
 from collections import defaultdict
@@ -81,7 +82,8 @@ async def _report_every(seconds):
         await asyncio.sleep(seconds)
         line = stats.report()
         if line:
-            logger.info(line)
+            # Every backend process reports its own threads.
+            logger.info("%s; process %s", line, os.getpid())
 
 
 def _run_with_fresh_connection(call, submitted=None):

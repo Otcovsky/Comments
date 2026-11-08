@@ -1,14 +1,34 @@
 # Run from the repository root; settings come from the env file next to it:
 #   docker compose --env-file ../comments.env up -d --build
 services:
-  backend:
+  # Applies the migrations once before the backend starts, then exits.
+  migrate:
     build: ./backend
+    # The backend's image: the second build of it is all cache.
+    image: comments-backend
+    command: python manage.py migrate --noinput
     env_file: ../comments.env
     environment:
       REDIS_URL: redis://redis:6379/0
     depends_on:
       redis:
         condition: service_healthy
+    restart: "no"
+
+  backend:
+    build: ./backend
+    image: comments-backend
+    env_file: ../comments.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      # Processes of uvicorn: one per core of the server. BACKEND_WORKERS=1 in the env file
+      # brings back a single process, for comparison.
+      WEB_CONCURRENCY: ${BACKEND_WORKERS:-2}
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   frontend:
