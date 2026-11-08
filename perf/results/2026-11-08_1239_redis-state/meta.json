@@ -1,0 +1,12 @@
+{
+  "label": "redis-state",
+  "mode": "load",
+  "suite_version": 3,
+  "started_at": "2026-11-08T10:39:12Z",
+  "local_git_sha": "2ff0aa017a855a9ec285f0ebc2194d1869174fc4",
+  "local_git_dirty_files": 0,
+  "app": {"git_sha": "2ff0aa017a855a9ec285f0ebc2194d1869174fc4", "git_dirty_files": null, "images": [{"ID":"sha256:62662c9c13adb2eace8f341be471833386bbc769c2189e59f63a7ddca4c97b24","ContainerName":"comments-frontend-1","Repository":"comments-frontend","Tag":"latest","Platform":"linux/arm64","Size":22121173,"LastTagTime":"2026-11-08T10:38:09.724087545Z"},{"ID":"sha256:fe9daae35cd4fd6ec22416aa4fe0cf6b3e36741e06ff45b9986253fe2a81c041","ContainerName":"comments-redis-1","Repository":"redis","Tag":"8.2-alpine","Platform":"linux/arm64/v8","Size":27881486,"LastTagTime":"2026-11-08T10:22:23.216743609Z"},{"ID":"sha256:425307007e5a54b20fe6b6da718c2e385999eddda28d44d329b7e7bfabe45610","ContainerName":"comments-broker-1","Repository":"rabbitmq","Tag":"4.1-alpine","Platform":"linux/arm64/v8","Size":82203201,"LastTagTime":"2026-11-08T10:22:26.917096943Z"},{"ID":"sha256:b3c6329711333a40542e2963eddb3c952aafaa935bb8dff6ab855c692ef7ce03","ContainerName":"comments-backend-1","Repository":"comments-backend","Tag":"latest","Platform":"linux/arm64","Size":174721314,"LastTagTime":"2026-11-08T10:38:08.782529634Z"}]},
+  "k6": "k6 v2.3.0 (commit/e088784614, go1.26.8, linux/arm64)",
+  "seed_args": "--top 10000 --replies 50000 --authors 2000 --seed 42",
+  "env_overrides": "WARMUP=20s DURATION=2m "
+}
