@@ -50,12 +50,15 @@ services:
     volumes:
       - broker-data:/var/lib/rabbitmq
     mem_limit: 512m
+    # Every check starts an Erlang VM for the CLI, about a fifth of a core for a second, so
+    # they are rare once the broker is up and frequent only while it starts.
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
+      interval: 30s
       timeout: 10s
-      retries: 10
-      start_period: 30s
+      retries: 3
+      start_period: 60s
+      start_interval: 2s
     restart: unless-stopped
 
 volumes:
