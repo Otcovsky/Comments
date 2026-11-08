@@ -16,5 +16,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 EXPOSE 8000
-# One process on purpose: groups, viewports and captchas live in its memory (docs/api.md).
+# One process for now. What processes must share lives in Redis (comments/shared.py).
 CMD ["sh", "-c", "python manage.py migrate --noinput && exec daphne -b 0.0.0.0 -p 8000 config.asgi:application"]

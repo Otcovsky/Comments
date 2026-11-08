@@ -3,7 +3,7 @@ from unittest import mock
 
 from django.test import SimpleTestCase, override_settings
 
-from comments import captcha, pools, ratelimit, tokens, validation
+from comments import captcha, pools, ratelimit, shared, tokens, validation
 from comments.errors import ApiError
 from comments.live import Viewers, parse_viewport
 from comments.sanitizer import MessageSanitizer, SanitizeError
@@ -96,25 +96,26 @@ class ValidationTests(SimpleTestCase):
 
 
 class RateLimiterTests(SimpleTestCase):
-    def test_allows_up_to_the_limit(self):
-        limiter = ratelimit.RateLimiter(2)
-        self.assertEqual([limiter.allow("a") for _ in range(3)], [True, True, False])
-        self.assertTrue(limiter.allow("b"))
+    def setUp(self):
+        shared.client().flushdb()
 
-    def test_a_new_window_starts_over(self):
-        limiter = ratelimit.RateLimiter(1)
-        with mock.patch.object(ratelimit.time, "monotonic", return_value=100):
-            limiter.allow("a")
-            self.assertFalse(limiter.allow("a"))
-        with mock.patch.object(ratelimit.time, "monotonic", return_value=100 + ratelimit.WINDOW_SECONDS):
-            self.assertTrue(limiter.allow("a"))
+    async def test_allows_up_to_the_limit(self):
+        limiter = ratelimit.RateLimiter("test", 2)
+        self.assertEqual([await limiter.allow("a") for _ in range(3)], [True, True, False])
+        self.assertTrue(await limiter.allow("b"))
 
-    def test_keeps_a_bounded_number_of_addresses(self):
-        limiter = ratelimit.RateLimiter(1)
-        with mock.patch.object(ratelimit, "MAX_TRACKED", 2):
-            for address in "abc":
-                limiter.allow(address)
-        self.assertEqual(list(limiter._windows), ["b", "c"])
+    async def test_the_window_expires(self):
+        limiter = ratelimit.RateLimiter("test", 1)
+        await limiter.allow("a")
+        self.assertFalse(await limiter.allow("a"))
+        ttl = await shared.aclient().ttl("rate:test:a")
+        self.assertTrue(0 < ttl <= ratelimit.WINDOW_SECONDS, ttl)
+        await shared.aclient().delete("rate:test:a")  # as Redis does when the window ends
+        self.assertTrue(await limiter.allow("a"))
+
+    async def test_limiters_count_apart(self):
+        await ratelimit.RateLimiter("one", 1).allow("a")
+        self.assertTrue(await ratelimit.RateLimiter("two", 1).allow("a"))
 
     def test_exempt_network(self):
         with override_settings(RATE_LIMIT_EXEMPT=ipaddress.ip_network("10.0.0.0/24")):
@@ -143,43 +144,30 @@ class PoolStatsTests(SimpleTestCase):
 
 
 class CaptchaStoreTests(SimpleTestCase):
-    def test_answer_ignores_case(self):
+    async def test_answer_ignores_case(self):
         store = captcha.CaptchaStore()
-        self.assertTrue(store.check(store.add("AbC12"), "aBc12"))
+        self.assertTrue(await store.check(await store.add("AbC12"), "aBc12"))
 
-    def test_is_single_use_even_after_a_wrong_answer(self):
+    async def test_is_single_use_even_after_a_wrong_answer(self):
         store = captcha.CaptchaStore()
-        key = store.add("AbC12")
-        self.assertFalse(store.check(key, "wrong"))
-        self.assertFalse(store.check(key, "AbC12"))
+        key = await store.add("AbC12")
+        self.assertFalse(await store.check(key, "wrong"))
+        self.assertFalse(await store.check(key, "AbC12"))
 
-    def test_non_ascii_answer_is_just_wrong(self):
+    async def test_non_ascii_answer_is_just_wrong(self):
         store = captcha.CaptchaStore()
-        self.assertFalse(store.check(store.add("AbC12"), "код"))
+        self.assertFalse(await store.check(await store.add("AbC12"), "код"))
 
-    def test_expires(self):
+    async def test_expires(self):
         store = captcha.CaptchaStore()
-        with mock.patch("comments.captcha.time.monotonic", return_value=1000):
-            key = store.add("AbC12")
-        with mock.patch("comments.captcha.time.monotonic", return_value=1000 + captcha.TTL_SECONDS):
-            self.assertFalse(store.check(key, "AbC12"))
+        key = await store.add("AbC12")
+        ttl = await shared.aclient().ttl(f"captcha:{key}")
+        self.assertTrue(0 < ttl <= captcha.TTL_SECONDS, ttl)
 
-    def test_expired_are_purged(self):
+    async def test_unknown_or_foreign_key(self):
         store = captcha.CaptchaStore()
-        with mock.patch("comments.captcha.time.monotonic", return_value=1000):
-            store.add("old")
-        with mock.patch("comments.captcha.time.monotonic", return_value=1000 + captcha.TTL_SECONDS):
-            store.add("new")
-        self.assertEqual(len(store._active), 1)
-
-    def test_size_is_bounded(self):
-        store = captcha.CaptchaStore()
-        with mock.patch("comments.captcha.MAX_ACTIVE", 2):
-            first = store.add("a")
-            store.add("b")
-            store.add("c")
-        self.assertEqual(len(store._active), 2)
-        self.assertFalse(store.check(first, "a"))
+        self.assertFalse(await store.check("0" * captcha.KEY_LENGTH, "AbC12"))
+        self.assertFalse(await store.check("x" * 10_000, "AbC12"))
 
     def test_image_is_a_png_data_url(self):
         self.assertTrue(captcha.render("AbC12").startswith("data:image/png;base64,"))
@@ -188,8 +176,8 @@ class CaptchaStoreTests(SimpleTestCase):
     async def test_answer_known_in_a_load_test_and_still_single_use(self):
         key, image = await captcha.issue()
         self.assertTrue(image.startswith("data:image/png;base64,"))
-        self.assertTrue(captcha.store.check(key, "PERF1"))
-        self.assertFalse(captcha.store.check(key, "PERF1"))
+        self.assertTrue(await captcha.store.check(key, "PERF1"))
+        self.assertFalse(await captcha.store.check(key, "PERF1"))
 
 
 @override_settings(AUTHOR_TOKEN_TTL=3600)
@@ -251,18 +239,46 @@ class ViewportTests(SimpleTestCase):
 
 
 class ViewersTests(SimpleTestCase):
-    def test_a_new_zone_replaces_the_old_one(self):
-        viewers = Viewers()
-        viewers.show("a", "CREATED_AT_DESC", 25, 1)
-        viewers.show("a", "EMAIL_ASC", 10, 2)
-        self.assertEqual(viewers.channels("CREATED_AT_DESC", 25, 1), set())
-        self.assertEqual(viewers.channels("EMAIL_ASC", 10, 2), {"a"})
-        self.assertEqual(viewers.page_sizes(), {"EMAIL_ASC": {10}})
+    def setUp(self):
+        shared.client().flushdb()
 
-    def test_drop(self):
-        viewers = Viewers()
-        viewers.show("a", "CREATED_AT_DESC", 25, 1)
-        viewers.show("b", "CREATED_AT_DESC", 10, 1)
-        viewers.drop("a")
-        viewers.drop("unknown")
-        self.assertEqual(viewers.page_sizes(), {"CREATED_AT_DESC": {10}})
+    async def test_a_new_zone_replaces_the_old_one(self):
+        viewers = Viewers("p1")
+        await viewers.show("a", "CREATED_AT_DESC", 25, 1)
+        await viewers.show("a", "EMAIL_ASC", 10, 2)
+        self.assertEqual(
+            await viewers.channels([("CREATED_AT_DESC", 25, 1), ("EMAIL_ASC", 10, 2)]), [set(), {"a"}]
+        )
+        self.assertEqual(await viewers.page_sizes(), {"EMAIL_ASC": {10}})
+
+    async def test_drop(self):
+        viewers = Viewers("p1")
+        await viewers.show("a", "CREATED_AT_DESC", 25, 1)
+        await viewers.show("b", "CREATED_AT_DESC", 10, 1)
+        await viewers.show("c", "CREATED_AT_DESC", 10, 2)
+        await viewers.drop("a")
+        await viewers.drop("b")
+        await viewers.drop("unknown")
+        self.assertEqual(await viewers.page_sizes(), {"CREATED_AT_DESC": {10}})
+
+    async def test_processes_share_the_tables(self):
+        one, two = Viewers("p1"), Viewers("p2")
+        await one.show("a", "CREATED_AT_DESC", 25, 1)
+        await two.show("b", "CREATED_AT_DESC", 25, 1)
+        await two.show("c", "EMAIL_ASC", 10, 1)
+        self.assertEqual(await one.page_sizes(), {"CREATED_AT_DESC": {25}, "EMAIL_ASC": {10}})
+        self.assertEqual(await one.channels([("CREATED_AT_DESC", 25, 1)]), [{"a", "b"}])
+
+    async def test_tables_of_a_stopped_process_are_dropped(self):
+        alive, stopped = Viewers("alive"), Viewers("stopped")
+        await alive.show("a", "CREATED_AT_DESC", 25, 1)
+        await stopped.show("b", "CREATED_AT_DESC", 25, 1)
+        await stopped.show("c", "EMAIL_ASC", 10, 1)
+        await alive.sweep()
+        self.assertEqual(await alive.page_sizes(), {"CREATED_AT_DESC": {25}, "EMAIL_ASC": {10}})
+        await shared.aclient().delete("viewers:alive:stopped")  # its heartbeats ran out
+        with self.assertLogs("comments.live", "INFO"):
+            await alive.sweep()
+        self.assertEqual(await alive.page_sizes(), {"CREATED_AT_DESC": {25}})
+        self.assertEqual(await alive.channels([("CREATED_AT_DESC", 25, 1)]), [{"a"}])
+        self.assertEqual(await shared.aclient().smembers("viewers:processes"), {"alive"})

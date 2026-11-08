@@ -107,20 +107,20 @@ def _client_address(request):
     return request.headers.get("X-Real-IP") or request.META.get("REMOTE_ADDR")
 
 
-def _check_rate(limiter, request):
+async def _check_rate(limiter, request):
     address = _client_address(request)
-    if not ratelimit.is_exempt(address) and not limiter.allow(address):
+    if not ratelimit.is_exempt(address) and not await limiter.allow(address):
         raise ApiError("RATE_LIMITED", {"rateLimit": "Слишком много запросов. Подождите минуту."})
 
 
-def _check_captcha(input, username, email, authorization):
+async def _check_captcha(input, username, email, authorization):
     """Returns (error for the user or None, whether a captcha was solved in this request)."""
     if input.captcha_key is None:
         if tokens.allows(authorization, username, email):
             return None, False
         return "Введите код с картинки.", False
     # Spent whatever else is wrong with the request: every attempt costs a captcha.
-    if captcha.store.check(input.captcha_key, input.captcha_value or ""):
+    if await captcha.store.check(input.captcha_key, input.captcha_value or ""):
         return None, True
     return "Неверный или устаревший код.", False
 
@@ -169,7 +169,7 @@ class Query:
 class Mutation:
     @strawberry.mutation
     async def issue_captcha(self, info: Info) -> Captcha:
-        _check_rate(ratelimit.captchas, info.context.request)
+        await _check_rate(ratelimit.captchas, info.context.request)
         key, image = await captcha.issue()
         return Captcha(key=key, image=image)
 
@@ -179,7 +179,7 @@ class Mutation:
     ) -> CreateCommentResult:
         request = info.context.request
         # Before the captcha check, so that a refused request does not spend the captcha.
-        _check_rate(ratelimit.comments, request)
+        await _check_rate(ratelimit.comments, request)
         username, email, home_page = input.username.strip(), input.email.strip(), input.home_page.strip()
         errors = {
             field: message
@@ -196,7 +196,7 @@ class Mutation:
         except ValueError as error:
             errors["text"] = str(error)
 
-        captcha_error, captcha_solved = _check_captcha(
+        captcha_error, captcha_solved = await _check_captcha(
             input, username, email, request.headers.get("Authorization")
         )
         if captcha_error:

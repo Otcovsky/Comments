@@ -15,7 +15,7 @@ class CommentsConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
     async def disconnect(self, code):
-        viewers.drop(self.channel_name)
+        await viewers.drop(self.channel_name)
         await self._join_groups(set())
 
     async def receive(self, text_data=None, bytes_data=None):
@@ -29,7 +29,7 @@ class CommentsConsumer(AsyncWebsocketConsumer):
         if viewport is None:
             return
         ordering, page_size, page, branch_ids = viewport
-        viewers.show(self.channel_name, ordering, page_size, page)
+        await viewers.show(self.channel_name, ordering, page_size, page)
         await self._join_groups({branch_group(branch_id) for branch_id in branch_ids})
 
     async def _join_groups(self, groups):

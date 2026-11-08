@@ -16,6 +16,15 @@ services:
       timeout: 2s
       retries: 30
 
+  test-redis:
+    image: redis:8.2-alpine
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
   tests:
     build: ./backend
     command: python manage.py test --noinput
@@ -26,6 +35,9 @@ services:
       DB_NAME: comments
       DB_USER: root
       DB_PASSWORD: test
+      REDIS_URL: redis://test-redis:6379/0
     depends_on:
       test-db:
+        condition: service_healthy
+      test-redis:
         condition: service_healthy

@@ -1,10 +1,9 @@
 """Database access. Everything here blocks, so callers go through pools.in_db_thread."""
-import threading
-
 from django.db import connection
 from django.db.models import Count, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 
+from . import shared
 from .models import Author, Comment
 
 # ordering -> (sort field, descending). Ties always go to the newer id, see docs/api.md.
@@ -54,30 +53,28 @@ def _top_level():
 class TopLevelCount:
     """The number of top-level comments. Every page of the list needs it, and counting 10,000
     index entries costs about as much as the page itself, so it is counted once and forgotten
-    when a top-level comment is saved or any comment deleted (signals in apps.py). The DB
-    threads share it, hence the lock."""
+    when a top-level comment is saved or any comment deleted (signals in apps.py). It lives in
+    Redis, so a comment saved by one backend process is counted by all of them.
 
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._value = None
-        # Moves on with every forget, so a count that started before it is not kept.
-        self._generation = 0
+    A forget moves the generation on, and a count is kept under the generation it started in:
+    one that started before a forget lands where nobody reads it."""
+
+    GENERATION_KEY = "top_level_count:generation"
+    # Counts of old generations are not read again; this only bounds how long they stay.
+    TTL_SECONDS = 3600
 
     def get(self):
-        with self._lock:
-            if self._value is not None:
-                return self._value
-            generation = self._generation
+        redis = shared.client()
+        key = f"top_level_count:{redis.get(self.GENERATION_KEY) or 0}"
+        value = redis.get(key)
+        if value is not None:
+            return int(value)
         value = _top_level().count()
-        with self._lock:
-            if generation == self._generation:
-                self._value = value
+        redis.set(key, value, ex=self.TTL_SECONDS)
         return value
 
     def forget(self, **kwargs):
-        with self._lock:
-            self._value = None
-            self._generation += 1
+        shared.client().incr(self.GENERATION_KEY)
 
 
 top_level_count = TopLevelCount()

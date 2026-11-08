@@ -22,9 +22,9 @@ npm run dev
 
 ## Бэкенд
 
-Один процесс Daphne: группы Channels, видимые зоны клиентов и капчи живут в его памяти, поэтому запускать несколько копий нельзя без брокера. База и файлы блокируют поток, так что вся такая работа идёт через постоянные потоки из `backend/comments/pools.py`.
+Один процесс Daphne. Слой Channels, видимые зоны клиентов, капчи, лимиты с одного IP и число корневых комментариев живут в Redis (`backend/comments/shared.py`), так что процессов может стать несколько. RabbitMQ уже поднят для будущей очереди задач Celery, но пока не используется. База и файлы блокируют поток, так что вся такая работа идёт через постоянные потоки из `backend/comments/pools.py`.
 
-Настройки приходят из окружения: `DB_*` и `S3_*` как в `docs/api.md`, а также `DJANGO_SECRET_KEY` и `DJANGO_ALLOWED_HOSTS` (через запятую, для проверки Origin у сокета). Только на время нагрузочных тестов задают `CAPTCHA_TEST_ANSWER`, `RATE_LIMIT_EXEMPT` и `DB_POOL_REPORT`, см. `perf/README.md`.
+Настройки приходят из окружения: `DB_*` и `S3_*` как в `docs/api.md`, а также `DJANGO_SECRET_KEY` и `DJANGO_ALLOWED_HOSTS` (через запятую, для проверки Origin у сокета). Адрес Redis (`REDIS_URL`) задаёт `docker-compose.yml`. Для RabbitMQ в `comments.env` нужен `RABBITMQ_PASSWORD`, имя пользователя по умолчанию `comments` (`RABBITMQ_USER`). Только на время нагрузочных тестов задают `CAPTCHA_TEST_ANSWER`, `RATE_LIMIT_EXEMPT` и `DB_POOL_REPORT`, см. `perf/README.md`.
 
 ## Тесты
 
@@ -42,4 +42,4 @@ docker compose -f docker-compose.test.yml run --rm --build tests
 docker compose --env-file ../comments.env up -d --build
 ```
 
-Миграции применяются при старте бэкенда. Снаружи открыт только порт 80, порт бэкенда закрыт.
+Миграции применяются при старте бэкенда. Снаружи открыт только порт 80, порты бэкенда, Redis и RabbitMQ закрыты.

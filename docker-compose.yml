@@ -4,6 +4,11 @@ services:
   backend:
     build: ./backend
     env_file: ../comments.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -17,3 +22,41 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  # State every backend process must share: captchas, limits per IP, who watches what, the
+  # channel layer. All of it may be lost, so nothing goes to disk, and a restart empties it.
+  # Only keys with a lifetime are evicted when memory runs out, the newest ones last.
+  redis:
+    image: redis:8.2-alpine
+    command: redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy volatile-lru
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # The Celery task queue. Nothing uses it yet.
+  broker:
+    image: rabbitmq:4.1-alpine
+    # RabbitMQ keeps its data under the node name, which comes from the host name.
+    hostname: broker
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-comments}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in the env file}
+      # Idle Erlang schedulers spin on the CPU by default; the server has two cores to share.
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "+sbwt none +sbwtdcpu none +sbwtdio none"
+    volumes:
+      - broker-data:/var/lib/rabbitmq
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  broker-data:

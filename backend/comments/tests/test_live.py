@@ -5,7 +5,7 @@ from unittest import mock
 from channels.exceptions import ChannelFull
 from channels.layers import get_channel_layer
 from channels.testing import WebsocketCommunicator
-from django.test import TransactionTestCase, override_settings
+from django.test import TransactionTestCase
 
 from comments import live, queries
 from comments.live import viewers
@@ -28,7 +28,6 @@ def viewport(page=1, page_size=25, ordering="CREATED_AT_DESC", thread=None, bran
     }
 
 
-@override_settings(CHANNEL_LAYERS={"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}})
 class SocketTests(TransactionTestCase):
     async def connect(self, *args, **options):
         socket = WebsocketCommunicator(application, "/ws/comments/")
@@ -175,7 +174,7 @@ class SocketTests(TransactionTestCase):
         socket = await self.connect()
         await socket.disconnect()
         self.sockets.clear()
-        self.assertEqual(viewers.page_sizes(), {})
+        self.assertEqual(await viewers.page_sizes(), {})
         await post()  # nobody watches, and nothing breaks
 
     async def test_full_channel_is_not_an_error(self):

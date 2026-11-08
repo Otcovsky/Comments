@@ -1,16 +1,17 @@
 """Who sees what, and which events reach them; see docs/api.md, section 6.
 
-Only the event loop touches `viewers`, so it needs no locks. It lives in process memory:
-after a restart clients reconnect and report their zone again.
+Who sees what lives in Redis, so that an event from any backend process finds the tables of
+all of them. A process that dies cannot drop its tables, so every process sends heartbeats,
+and the others drop the tables of one that stopped.
 """
 import asyncio
 import logging
-from collections import defaultdict
+import uuid
 
 from channels.exceptions import ChannelFull
 from channels.layers import get_channel_layer
 
-from . import queries
+from . import queries, shared
 from .pools import in_db_thread
 from .validation import parse_id
 
@@ -18,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 MAX_PAGE_SIZE = 100
 MAX_BRANCHES = 200
+# A process is alive while its heartbeat is younger than PROCESS_TTL_SECONDS. A process whose
+# event loop stalls that long loses its tables: its clients hear nothing until they move.
+HEARTBEAT_SECONDS = 10
+PROCESS_TTL_SECONDS = 60
 
 EVENT_HANDLER = "comment.event"  # CommentsConsumer.comment_event
 
@@ -26,39 +31,119 @@ def branch_group(comment_id):
     return f"branch.{comment_id}"
 
 
+# The keys, kept consistent by the scripts below:
+#   viewers:table:<ordering>:<size>:<page>  channels showing that page
+#   viewers:sizes                           "<ordering>:<size>" -> channels showing a page of it
+#   viewers:of:<process>                    channel -> its table, "<ordering>:<size>:<page>"
+#   viewers:alive:<process>                 exists while the process sends heartbeats
+#   viewers:processes                       processes that may have tables
+# The keys of a table are found from what the scripts read, so they work on a single Redis
+# only, not on a cluster.
+_DROP = """
+local function drop(process, channel)
+    local of = 'viewers:of:' .. process
+    local tbl = redis.call('HGET', of, channel)
+    if not tbl then
+        return
+    end
+    redis.call('HDEL', of, channel)
+    redis.call('SREM', 'viewers:table:' .. tbl, channel)
+    local size = string.match(tbl, '^(.+):%d+$')
+    if redis.call('HINCRBY', 'viewers:sizes', size, -1) <= 0 then
+        redis.call('HDEL', 'viewers:sizes', size)
+    end
+end
+"""
+SHOW = _DROP + """
+local process, channel, tbl, ttl = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
+drop(process, channel)
+redis.call('HSET', 'viewers:of:' .. process, channel, tbl)
+redis.call('SADD', 'viewers:table:' .. tbl, channel)
+redis.call('HINCRBY', 'viewers:sizes', string.match(tbl, '^(.+):%d+$'), 1)
+redis.call('SADD', 'viewers:processes', process)
+redis.call('SET', 'viewers:alive:' .. process, 1, 'EX', ttl)
+"""
+DROP = _DROP + """
+drop(ARGV[1], ARGV[2])
+"""
+# Drops every table of a process unless it is alive; returns how many.
+SWEEP = _DROP + """
+local process = ARGV[1]
+if redis.call('EXISTS', 'viewers:alive:' .. process) == 1 then
+    return 0
+end
+local of = 'viewers:of:' .. process
+local channels = redis.call('HKEYS', of)
+for _, channel in ipairs(channels) do
+    drop(process, channel)
+end
+redis.call('DEL', of)
+redis.call('SREM', 'viewers:processes', process)
+return #channels
+"""
+
+
 class Viewers:
     """Open tables: which channels show which page of which ordering at which size."""
 
-    def __init__(self):
-        self._tables = {}  # channel -> (ordering, page size, page)
-        self._channels = defaultdict(set)  # (ordering, page size, page) -> channels
+    def __init__(self, process):
+        self.process = process
+        self._heartbeats = {}  # event loop -> its heartbeat task
 
-    def show(self, channel, ordering, page_size, page):
-        self.drop(channel)
-        table = (ordering, page_size, page)
-        self._tables[channel] = table
-        self._channels[table].add(channel)
+    async def show(self, channel, ordering, page_size, page):
+        self._keep_alive()
+        table = f"{ordering}:{page_size}:{page}"
+        await self._run(SHOW, channel, table, PROCESS_TTL_SECONDS)
 
-    def drop(self, channel):
-        table = self._tables.pop(channel, None)
-        if table is None:
-            return
-        self._channels[table].discard(channel)
-        if not self._channels[table]:
-            del self._channels[table]
+    async def drop(self, channel):
+        await self._run(DROP, channel)
 
-    def page_sizes(self):
+    async def page_sizes(self):
         """Page sizes open right now, by ordering."""
-        sizes = defaultdict(set)
-        for ordering, page_size, _ in self._channels:
-            sizes[ordering].add(page_size)
+        sizes = {}
+        for size in await shared.aclient().hkeys("viewers:sizes"):
+            ordering, page_size = size.rsplit(":", 1)
+            sizes.setdefault(ordering, set()).add(int(page_size))
         return sizes
 
-    def channels(self, ordering, page_size, page):
-        return set(self._channels.get((ordering, page_size, page), ()))
+    async def channels(self, tables):
+        """The channels of each (ordering, page size, page), in one round trip."""
+        async with shared.aclient().pipeline(transaction=False) as pipe:
+            for ordering, page_size, page in tables:
+                pipe.smembers(f"viewers:table:{ordering}:{page_size}:{page}")
+            return await pipe.execute()
+
+    async def sweep(self):
+        """Says this process is alive and drops the tables of processes that are not."""
+        redis = shared.aclient()
+        await redis.set(f"viewers:alive:{self.process}", 1, ex=PROCESS_TTL_SECONDS)
+        dropped = 0
+        for process in await redis.smembers("viewers:processes"):
+            if process != self.process:
+                dropped += await redis.eval(SWEEP, 0, process)
+        if dropped:
+            logger.info("Dropped %s viewers of stopped processes", dropped)
+
+    async def _run(self, script, *args):
+        await shared.aclient().eval(script, 0, self.process, *args)
+
+    def _keep_alive(self):
+        loop = asyncio.get_running_loop()
+        if loop not in self._heartbeats:
+            for closed in [other for other in self._heartbeats if other.is_closed()]:
+                del self._heartbeats[closed]
+            self._heartbeats[loop] = loop.create_task(self._heartbeat())
+
+    async def _heartbeat(self):
+        while True:
+            await asyncio.sleep(HEARTBEAT_SECONDS)
+            try:
+                await self.sweep()
+            except Exception:
+                logger.exception("Viewers heartbeat failed")
 
 
-viewers = Viewers()
+viewers = Viewers(uuid.uuid4().hex)
 
 
 def parse_viewport(message):
@@ -95,7 +180,7 @@ async def _send_to_page(comment_id, payload, newest=False):
     A comment just created is the newest one, so by date its place needs no counting: it is
     the first, or the last. Comments posted at the same moment may swap places, which only
     matters at a page boundary, and the clients reload the page anyway."""
-    sizes = viewers.page_sizes()
+    sizes = await viewers.page_sizes()
     if not sizes:
         return
     positions = {}
@@ -107,16 +192,20 @@ async def _send_to_page(comment_id, payload, newest=False):
     counted = [ordering for ordering in sizes if ordering not in positions]
     if counted:
         positions.update(await in_db_thread(queries.positions, comment_id, counted))
+    tables = [
+        (ordering, page_size, positions[ordering] // page_size + 1)
+        for ordering, page_sizes in sizes.items()
+        for page_size in page_sizes
+    ]
     layer = get_channel_layer()
     message = {"type": EVENT_HANDLER, "payload": payload}
-    for ordering, page_sizes in sizes.items():
-        for page_size in page_sizes:
-            for channel in viewers.channels(ordering, page_size, positions[ordering] // page_size + 1):
-                try:
-                    await layer.send(channel, message)
-                except ChannelFull:
-                    # A client too slow to read loses this event, as after a dropped connection.
-                    logger.warning("Channel is full, event dropped")
+    for channels in await viewers.channels(tables):
+        for channel in channels:
+            try:
+                await layer.send(channel, message)
+            except ChannelFull:
+                # A client too slow to read loses this event, as after a dropped connection.
+                logger.warning("Channel is full, event dropped")
 
 
 async def _send_to_branch(comment_id, payload):
@@ -160,6 +249,9 @@ def comment_created_later(comment, parent):
 
 
 async def finish_dispatching():
-    """Waits until the events of the comments saved so far are sent (for tests)."""
-    while _dispatching:
-        await asyncio.gather(*_dispatching)
+    """Waits until the events of the comments saved so far are sent (for tests). A test that
+    saves a comment without waiting leaves its task to its own event loop, which cancels it on
+    closing and never runs the callback that forgets it: such tasks are skipped."""
+    loop = asyncio.get_running_loop()
+    while pending := [task for task in _dispatching if task.get_loop() is loop and not task.done()]:
+        await asyncio.gather(*pending)

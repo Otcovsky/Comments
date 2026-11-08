@@ -165,7 +165,7 @@ class CreateTests(TransactionTestCase):
         return await graphql(CREATE, {"input": form(**fields)}, headers)
 
     async def test_with_captcha(self):
-        payload = await self.create(text="<i>hi</i>", home_page="https://bob.io", **solved_captcha())
+        payload = await self.create(text="<i>hi</i>", home_page="https://bob.io", **await solved_captcha())
         result = payload["data"]["createComment"]
         comment = result["comment"]
         self.assertEqual(comment["username"], "bob")
@@ -178,7 +178,7 @@ class CreateTests(TransactionTestCase):
         self.assertEqual(result["tokenExpiresIn"], 3600)
 
     async def test_token_replaces_the_captcha(self):
-        first = (await self.create(**solved_captcha()))["data"]["createComment"]
+        first = (await self.create(**await solved_captcha()))["data"]["createComment"]
         headers = {"Authorization": f"Bearer {first['token']}"}
         second = (await self.create(headers))["data"]["createComment"]
         self.assertTrue(second["comment"]["id"])
@@ -195,11 +195,11 @@ class CreateTests(TransactionTestCase):
         self.assertIn("captchaValue", error_of(payload)["fields"])
 
     async def test_wrong_captcha(self):
-        payload = await self.create(**{**solved_captcha(), "captchaValue": "wrong"})
+        payload = await self.create(**{**await solved_captcha(), "captchaValue": "wrong"})
         self.assertIn("captchaValue", error_of(payload)["fields"])
 
     async def test_captcha_is_spent_by_a_failed_attempt(self):
-        captcha = solved_captcha()
+        captcha = await solved_captcha()
         payload = await self.create(username="не латиница", **captcha)
         self.assertEqual(list(error_of(payload)["fields"]), ["username"])
         self.assertIn("captchaValue", error_of(await self.create(**captcha))["fields"])
@@ -259,13 +259,13 @@ class RateLimitTests(TransactionTestCase):
     async def test_comments_over_the_limit_are_refused_and_keep_the_captcha(self):
         address = {"X-Real-IP": "198.51.100.1"}
         with mock.patch.object(ratelimit.comments, "limit", 1):
-            await graphql(CREATE, {"input": form(**solved_captcha())}, address)
-            second = solved_captcha()
+            await graphql(CREATE, {"input": form(**await solved_captcha())}, address)
+            second = await solved_captcha()
             payload = await graphql(CREATE, {"input": form(**second)}, address)
         self.assertEqual(error_of(payload)["code"], "RATE_LIMITED")
         self.assertIn("rateLimit", error_of(payload)["fields"])
         self.assertEqual(await Comment.objects.acount(), 1)
-        self.assertTrue(captcha.store.check(second["captchaKey"], second["captchaValue"]))
+        self.assertTrue(await captcha.store.check(second["captchaKey"], second["captchaValue"]))
 
     async def test_captchas_over_the_limit_are_refused_and_aliases_count(self):
         query = "mutation { a: issueCaptcha { key } b: issueCaptcha { key } }"
@@ -286,7 +286,7 @@ class RateLimitTests(TransactionTestCase):
         with mock.patch.object(ratelimit.comments, "limit", 1), mock.patch.object(ratelimit.captchas, "limit", 1):
             for _ in range(2):
                 self.assertNotIn("errors", await graphql("mutation { issueCaptcha { key } }", headers=address))
-                self.assertNotIn("errors", await graphql(CREATE, {"input": form(**solved_captcha())}, address))
+                self.assertNotIn("errors", await graphql(CREATE, {"input": form(**await solved_captcha())}, address))
 
 
 class UploadTests(TransactionTestCase):

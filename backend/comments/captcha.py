@@ -2,47 +2,44 @@ import asyncio
 import base64
 import random
 import secrets
-import time
 import uuid
-from collections import OrderedDict
 from io import BytesIO
 
 from django.conf import settings
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from . import shared
+
 LENGTH = 5
 TTL_SECONDS = 5 * 60
-# Enough for a burst; past it the oldest pictures stop working first.
-MAX_ACTIVE = 10_000
+KEY_LENGTH = 32  # uuid4().hex
 # Ambiguous characters (0/O, 1/l/I) are excluded.
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
 SIZE = (160, 56)
 
 
 class CaptchaStore:
-    """Issued captchas in process memory. They live for minutes, so a restart costs a user one
-    new picture, and no table has to be cleaned up. Only the event loop touches the store, so
-    taking a key is atomic: of two parallel requests with the same key, one gets nothing."""
+    """Issued captchas in Redis, so that any backend process can check one another process
+    issued. They live for minutes and expire on their own, so no table has to be cleaned up.
+    Taking a key is atomic: of two parallel requests with the same key, one gets nothing."""
 
-    def __init__(self):
-        self._active = OrderedDict()  # key -> (answer, expiry), oldest first
-
-    def add(self, answer):
-        now = time.monotonic()
-        while self._active and (
-            len(self._active) >= MAX_ACTIVE or next(iter(self._active.values()))[1] <= now
-        ):
-            self._active.popitem(last=False)
+    async def add(self, answer):
         key = uuid.uuid4().hex
-        self._active[key] = (answer, now + TTL_SECONDS)
+        await shared.aclient().set(_redis_key(key), answer, ex=TTL_SECONDS)
         return key
 
-    def check(self, key, value):
+    async def check(self, key, value):
         """Spends the captcha, whatever the answer."""
-        answer, expiry = self._active.pop(key, (None, 0))
-        if answer is None or expiry <= time.monotonic():
+        if len(key) != KEY_LENGTH:  # not one of ours, and Redis keys stay short
+            return False
+        answer = await shared.aclient().getdel(_redis_key(key))
+        if answer is None:
             return False
         return secrets.compare_digest(answer.lower().encode(), value.lower().encode())
+
+
+def _redis_key(key):
+    return f"captcha:{key}"
 
 
 store = CaptchaStore()
@@ -52,7 +49,7 @@ async def issue():
     # A load test knows the answer in advance; the picture is still drawn and the key single-use.
     answer = settings.CAPTCHA_TEST_ANSWER or "".join(secrets.choice(ALPHABET) for _ in range(LENGTH))
     image = await asyncio.to_thread(render, answer)
-    return store.add(answer), image
+    return await store.add(answer), image
 
 
 def render(answer):

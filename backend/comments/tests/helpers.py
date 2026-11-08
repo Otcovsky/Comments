@@ -44,8 +44,8 @@ def error_of(payload):
     return payload["errors"][0]["extensions"]
 
 
-def solved_captcha():
-    return {"captchaKey": captcha.store.add("AbC12"), "captchaValue": "AbC12"}
+async def solved_captcha():
+    return {"captchaKey": await captcha.store.add("AbC12"), "captchaValue": "AbC12"}
 
 
 def form(username="bob", email="bob@example.com", home_page="", text="Hello", parent_id=None, **extra):

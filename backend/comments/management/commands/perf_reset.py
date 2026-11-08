@@ -1,3 +1,5 @@
+from comments import shared
+
 from .seed_perf import Command as SeedCommand
 
 
@@ -8,8 +10,9 @@ class Command(SeedCommand):
     )
 
     def handle(self, *args, **options):
-        # Now only the backend's memory keeps state between requests (captchas, limits,
-        # viewports), and perf/remote/app.sh restarts the backend after this command. Anything
-        # added later that outlives a restart (a cache, a task queue, a search index) must be
-        # emptied here, or the first run after the change starts warm.
         super().handle(*args, **options)
+        # Everything Redis keeps (captchas, limits, viewports, the count of top-level comments)
+        # goes too, or the run starts warm. perf/remote/app.sh then restarts every service, and
+        # anything added later that outlives a restart (a task queue, a search index) must be
+        # emptied here as well.
+        shared.client().flushdb()
