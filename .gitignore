@@ -11,6 +11,9 @@ dist/
 *.env
 # The fixed load test suite: settings, not secrets.
 !perf/suite.env
+# Values for local containers only, and a template without values.
+!local/comments.env
+!comments.env.example
 *.key
 *.pem
 .claude/

@@ -2,7 +2,7 @@
 -- Matches what the Django migrations create in MySQL. To open in MySQL Workbench:
 -- File -> Import -> Reverse Engineer MySQL Create Script... -> select this file.
 -- Foreign keys have no ON DELETE action: Django removes dependent rows itself.
--- Captchas live in the memory of the backend process, so they have no table.
+-- Captchas live in Redis for minutes, so they have no table.
 
 CREATE SCHEMA IF NOT EXISTS `comments` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `comments`;

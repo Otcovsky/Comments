@@ -1,0 +1,63 @@
+# The whole app on one machine, without the cloud: the MySQL and the S3 bucket of the server
+# are replaced by containers. Adds to docker-compose.yml; run from the repository root:
+#   docker compose --env-file local/comments.env -f docker-compose.yml -f docker-compose.local.yml up -d --build
+# Settings are in local/comments.env, and the app opens on http://localhost:8080/.
+services:
+  migrate:
+    # An image of its own, so a local run next to the server's stack leaves its image alone.
+    image: comments-local-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  backend:
+    image: comments-local-backend
+    depends_on:
+      bucket:
+        condition: service_completed_successfully
+
+  worker:
+    image: comments-local-backend
+    depends_on:
+      bucket:
+        condition: service_completed_successfully
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    # Over TCP: while the first start initializes the data, the server listens on a socket only.
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+    restart: unless-stopped
+
+  # S3-compatible storage in place of Object Storage: the same boto3 calls, the same anonymous
+  # reads by nginx (local/s3.json), with the endpoint from S3_ENDPOINT.
+  s3:
+    image: chrislusf/seaweedfs:4.51
+    command: server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -master.volumeSizeLimitMB=256
+    volumes:
+      - s3-data:/data
+      - ./local/s3.json:/etc/seaweedfs/s3.json:ro
+    restart: unless-stopped
+
+  # Creates the bucket on the first start, then exits.
+  bucket:
+    image: comments-local-backend
+    command: python manage.py create_bucket
+    env_file: ${COMMENTS_ENV_FILE}
+    depends_on:
+      - s3
+    restart: "no"
+
+volumes:
+  mysql-data:
+  s3-data:

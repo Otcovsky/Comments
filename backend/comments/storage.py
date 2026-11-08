@@ -49,3 +49,15 @@ def exists(key):
 def delete(key):
     # The bucket answers success for a key that is already gone.
     _client().delete_object(Bucket=settings.S3_BUCKET, Key=key)
+
+
+def create_bucket():
+    """Creates the bucket unless it exists; returns whether it was created."""
+    try:
+        _client().head_bucket(Bucket=settings.S3_BUCKET)
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") not in ("404", "NoSuchBucket", "NotFound"):
+            raise
+        _client().create_bucket(Bucket=settings.S3_BUCKET)
+        return True
+    return False
