@@ -58,8 +58,8 @@ CHANNEL_LAYERS = {
     }
 }
 # The Celery task queue in RabbitMQ (comments/tasks.py). A task's result is not kept, and a
-# task is acknowledged once it ran, so one lost with its worker runs again: both tasks may run
-# twice. A publish that fails is not retried for long: the caller has its own way out.
+# task is acknowledged once it ran, so one lost with its worker runs again. A publish that
+# fails is not retried for long: the caller logs it and goes on.
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "amqp://guest:guest@broker:5672//")
 CELERY_BROKER_CONNECTION_TIMEOUT = 2
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True

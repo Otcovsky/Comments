@@ -280,24 +280,12 @@ _dispatching = set()
 
 def comment_created_later(comment, parent):
     """Sends the events about a saved comment without making its author wait: finding out
-    who sees the comment costs more than saving it."""
-    task = asyncio.create_task(_dispatch(comment, parent))
+    who sees the comment costs more than saving it. This process sends them itself: with the
+    Celery worker on the same two cores the capacity fell from 192 to 160 it/s
+    (perf/results/OPTIMIZATIONS.md, section 7)."""
+    task = asyncio.create_task(comment_created(comment, parent))
     _dispatching.add(task)
     task.add_done_callback(_dispatching.discard)
-
-
-async def _dispatch(comment, parent):
-    """The Celery worker sends the events (tasks.send_events). Without the broker this
-    process sends them itself, as before the queue existed."""
-    from . import tasks  # tasks imports this module
-
-    comment = {"id": comment["id"], "root_id": comment["root_id"]}
-    parent = parent and {"id": parent["id"], "parent_id": parent["parent_id"]}
-    try:
-        await tasks.queue(tasks.send_events, comment, parent)
-    except Exception as error:
-        shared.warn(logger, "Events sent by the web process, the broker failed", error)
-        await comment_created(comment, parent)
 
 
 async def finish_dispatching():

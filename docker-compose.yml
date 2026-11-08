@@ -34,12 +34,12 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  # Celery: the events of new comments and the deletes of orphaned files (comments/tasks.py).
-  # Two processes, as many as the cores; most of a task is waiting for MySQL and Redis.
+  # Celery: deletes the files of comments that were not saved (comments/tasks.py). Such a
+  # task is rare, so one process is plenty.
   worker:
     image: comments-backend
     command: >-
-      celery -A config worker --concurrency 2 --loglevel WARNING
+      celery -A config worker --concurrency 1 --loglevel WARNING
       --without-gossip --without-mingle --without-heartbeat
     env_file: ../comments.env
     environment:
