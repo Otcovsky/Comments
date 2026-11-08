@@ -1,5 +1,8 @@
 import ipaddress
+import logging
 from unittest import mock
+
+import redis
 
 from django.test import SimpleTestCase, override_settings
 
@@ -7,6 +10,8 @@ from comments import captcha, pools, ratelimit, shared, tokens, validation
 from comments.errors import ApiError
 from comments.live import Viewers, parse_viewport
 from comments.sanitizer import MessageSanitizer, SanitizeError
+
+from .helpers import redis_down
 
 
 class SanitizerTests(SimpleTestCase):
@@ -281,3 +286,45 @@ class ViewersTests(SimpleTestCase):
         await alive.drop("a")
         self.assertEqual(await alive.page_sizes(), {})
         self.assertEqual(await shared.aclient().smembers("viewers:processes"), {"alive"})
+
+    async def test_tables_lost_by_redis_come_back_with_the_heartbeat(self):
+        viewers = Viewers("p1")
+        await viewers.show("a", "CREATED_AT_DESC", 25, 1)
+        await viewers.show("b", "EMAIL_ASC", 10, 3)
+        await shared.aclient().flushdb()  # Redis restarted
+        self.assertEqual(await viewers.page_sizes(), {})
+        await viewers.sweep()
+        self.assertEqual(await viewers.page_sizes(), {"CREATED_AT_DESC": {25}, "EMAIL_ASC": {10}})
+        self.assertEqual(await shared.aclient().hgetall("viewers:of:p1"), {"a": "CREATED_AT_DESC:25:1", "b": "EMAIL_ASC:10:3"})
+
+    async def test_writes_that_failed_are_repeated(self):
+        viewers = Viewers("p1")
+        await viewers.show("a", "CREATED_AT_DESC", 25, 1)
+        await viewers.show("b", "CREATED_AT_DESC", 25, 1)
+        with redis_down():
+            await viewers.show("a", "EMAIL_ASC", 10, 2)  # as many channels as before
+            await viewers.drop("b")
+            with self.assertRaises(redis.RedisError):
+                await viewers.sweep()
+        await viewers.sweep()
+        self.assertEqual(await viewers.page_sizes(), {"EMAIL_ASC": {10}})
+        self.assertEqual(await shared.aclient().hgetall("viewers:of:p1"), {"a": "EMAIL_ASC:10:2"})
+
+
+class RedisDownTests(SimpleTestCase):
+    async def test_limits_let_requests_through(self):
+        with redis_down(), self.assertLogs("comments.ratelimit", "WARNING"):
+            shared._warned.clear()
+            self.assertTrue(await ratelimit.RateLimiter("test", 0).allow("a"))
+
+    def test_warnings_are_not_repeated_for_a_while(self):
+        shared._warned.clear()
+        with self.assertLogs("comments.test", "WARNING") as logs:
+            for _ in range(3):
+                shared.warn(logging.getLogger("comments.test"), "Redis failed", "boom")
+        self.assertEqual(len(logs.records), 1)
+
+    def test_clients_give_up_on_a_redis_that_hangs(self):
+        options = shared.client().connection_pool.connection_kwargs
+        self.assertEqual((options["socket_timeout"], options["socket_connect_timeout"]), (1, 1))
+

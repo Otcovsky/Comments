@@ -1,10 +1,15 @@
 """Database access. Everything here blocks, so callers go through pools.in_db_thread."""
+import logging
+
+import redis
 from django.db import connection
 from django.db.models import Count, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 
 from . import shared
 from .models import Author, Comment
+
+logger = logging.getLogger(__name__)
 
 # ordering -> (sort field, descending). Ties always go to the newer id, see docs/api.md.
 ORDERINGS = {
@@ -57,24 +62,37 @@ class TopLevelCount:
     Redis, so a comment saved by one backend process is counted by all of them.
 
     A forget moves the generation on, and a count is kept under the generation it started in:
-    one that started before a forget lands where nobody reads it."""
+    one that started before a forget lands where nobody reads it.
+
+    Without Redis the list still works: the count comes from the database. A forget that
+    fails must not fail the comment already saved (or a migration), so it is only logged; the
+    count it missed lives TTL_SECONDS at most."""
 
     GENERATION_KEY = "top_level_count:generation"
-    # Counts of old generations are not read again; this only bounds how long they stay.
-    TTL_SECONDS = 3600
+    TTL_SECONDS = 60
 
     def get(self):
-        redis = shared.client()
-        key = f"top_level_count:{redis.get(self.GENERATION_KEY) or 0}"
-        value = redis.get(key)
+        try:
+            return self._cached()
+        except redis.RedisError as error:
+            shared.warn(logger, "Top-level count from the database, Redis failed", error)
+            return _top_level().count()
+
+    def _cached(self):
+        r = shared.client()
+        key = f"top_level_count:{r.get(self.GENERATION_KEY) or 0}"
+        value = r.get(key)
         if value is not None:
             return int(value)
         value = _top_level().count()
-        redis.set(key, value, ex=self.TTL_SECONDS)
+        r.set(key, value, ex=self.TTL_SECONDS)
         return value
 
     def forget(self, **kwargs):
-        shared.client().incr(self.GENERATION_KEY)
+        try:
+            shared.client().incr(self.GENERATION_KEY)
+        except redis.RedisError as error:
+            shared.warn(logger, "Could not forget the top-level count", error)
 
 
 top_level_count = TopLevelCount()

@@ -2,13 +2,18 @@
 cannot see which GraphQL operation a request carries.
 
 The counters live in Redis, so that the limit holds for all backend processes together,
-and expire with their window.
+and expire with their window. Without Redis requests go through: nginx still limits each
+address, and an author with a token can still post.
 """
 import ipaddress
+import logging
 
+import redis
 from django.conf import settings
 
 from . import shared
+
+logger = logging.getLogger(__name__)
 
 WINDOW_SECONDS = 60
 COMMENTS_PER_WINDOW = 10
@@ -23,10 +28,14 @@ class RateLimiter:
     async def allow(self, address):
         """A window starts with the first request from the address and lasts WINDOW_SECONDS."""
         key = f"rate:{self.name}:{address}"
-        async with shared.aclient().pipeline(transaction=True) as pipe:
-            pipe.set(key, 0, ex=WINDOW_SECONDS, nx=True)
-            pipe.incr(key)
-            _, requests = await pipe.execute()
+        try:
+            async with shared.aclient().pipeline(transaction=True) as pipe:
+                pipe.set(key, 0, ex=WINDOW_SECONDS, nx=True)
+                pipe.incr(key)
+                _, requests = await pipe.execute()
+        except redis.RedisError as error:
+            shared.warn(logger, "Limits per IP are off, Redis failed", error)
+            return True
         return requests <= self.limit
 
 

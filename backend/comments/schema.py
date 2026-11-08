@@ -3,6 +3,7 @@ and a Comment holds plain values, so resolving its fields costs no SQL."""
 import enum
 import logging
 
+import redis
 import strawberry
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
@@ -11,7 +12,7 @@ from strawberry.extensions import MaskErrors, MaxAliasesLimiter, MaxTokensLimite
 from strawberry.file_uploads import Upload
 from strawberry.types import Info
 
-from . import attachments, captcha, live, queries, ratelimit, storage, tokens, validation
+from . import attachments, captcha, live, queries, ratelimit, shared, storage, tokens, validation
 from .errors import ApiError
 from .models import Comment as CommentModel
 from .pools import in_db_thread, in_file_thread
@@ -120,7 +121,12 @@ async def _check_captcha(input, username, email, authorization):
             return None, False
         return "Введите код с картинки.", False
     # Spent whatever else is wrong with the request: every attempt costs a captcha.
-    if await captcha.store.check(input.captcha_key, input.captcha_value or ""):
+    try:
+        solved = await captcha.store.check(input.captcha_key, input.captcha_value or "")
+    except redis.RedisError as error:
+        shared.warn(logger, "Captchas cannot be checked, Redis failed", error)
+        return "Не удалось проверить код. Обновите картинку и попробуйте ещё раз.", False
+    if solved:
         return None, True
     return "Неверный или устаревший код.", False
 

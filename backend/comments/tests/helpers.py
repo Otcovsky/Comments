@@ -1,9 +1,13 @@
 import itertools
 import json
+from contextlib import contextmanager
+from unittest import mock
 
+import redis
+import redis.asyncio
 from django.test import AsyncClient
 
-from comments import captcha, live, tokens
+from comments import captcha, live, shared, tokens
 from comments.models import Author, Comment
 
 CREATE = """
@@ -38,6 +42,19 @@ async def graphql(query, variables=None, headers=None):
     # The events go out after the response; a test sees the state once they are sent.
     await live.finish_dispatching()
     return json.loads(response.content)
+
+
+@contextmanager
+def redis_down():
+    """Every call to Redis fails at once, as with Redis stopped. The channel layer keeps its
+    own connections and still works."""
+    url = "redis://127.0.0.1:1/0"  # nothing listens there
+    blocking = redis.Redis.from_url(url)
+    with (
+        mock.patch.object(shared, "client", lambda: blocking),
+        mock.patch.object(shared, "aclient", lambda: redis.asyncio.Redis.from_url(url)),
+    ):
+        yield
 
 
 def error_of(payload):

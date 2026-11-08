@@ -12,7 +12,7 @@ from django.test import AsyncClient, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from PIL import Image
 
-from comments import captcha, live, queries, ratelimit
+from comments import captcha, live, queries, ratelimit, shared
 from comments.models import Author, Comment
 
 from .helpers import (
@@ -25,6 +25,7 @@ from .helpers import (
     make_comment,
     own_address,
     post,
+    redis_down,
     solved_captcha,
 )
 
@@ -347,6 +348,43 @@ class UploadTests(TransactionTestCase):
         client.return_value.put_object.assert_not_called()
 
 
+class RedisDownTests(TransactionTestCase):
+    """Without Redis the comments are read and written; only captchas wait for it."""
+
+    async def test_list_counts_in_the_database(self):
+        author = await sync_to_async(make_author)()
+        for _ in range(3):
+            await sync_to_async(make_comment)(author)
+        with redis_down():
+            data = (await graphql(COMMENTS, list_variables(page_size=2)))["data"]["comments"]
+        self.assertEqual(data["count"], 3)
+        self.assertEqual(len(data["results"]), 2)
+
+    async def test_author_with_a_token_posts_once(self):
+        # Every limit is off, the count is not forgotten, and the events cannot be sent: none
+        # of that may turn a saved comment into an error the author would retry.
+        shared._warned.clear()
+        with redis_down(), self.assertLogs("comments", "WARNING"):
+            payload = await graphql(CREATE, {"input": form()}, bearer())
+        self.assertNotIn("errors", payload)
+        self.assertEqual(await Comment.objects.acount(), 1)
+
+    async def test_captcha_cannot_be_checked(self):
+        solved = await solved_captcha()
+        with redis_down():
+            payload = await graphql(CREATE, {"input": form(**solved)})
+        self.assertEqual(error_of(payload)["code"], "VALIDATION")
+        self.assertIn("Обновите картинку", error_of(payload)["fields"]["captchaValue"])
+        self.assertEqual(await Comment.objects.acount(), 0)
+
+    async def test_no_captcha_is_issued(self):
+        # A server failure for the client: it shows a general error.
+        with redis_down(), self.assertLogs("strawberry.execution", "ERROR"):
+            payload = await graphql("mutation { issueCaptcha { key } }")
+        self.assertIsNone(payload["data"])
+        self.assertNotIn("redis", json.dumps(payload).lower())
+
+
 class TopLevelCountTests(TransactionTestCase):
     def test_counted_once_until_a_top_level_comment_is_saved(self):
         author = make_author()
@@ -361,6 +399,20 @@ class TopLevelCountTests(TransactionTestCase):
         self.assertEqual(queries.top_level_count.get(), 2)
         root.delete()
         self.assertEqual(queries.top_level_count.get(), 1)
+
+    def test_without_redis_it_is_counted_every_time_and_a_forget_does_not_fail(self):
+        make_comment(make_author())
+        with redis_down():
+            queries.top_level_count.forget()
+            with self.assertNumQueries(2):
+                self.assertEqual(queries.top_level_count.get(), 1)
+                self.assertEqual(queries.top_level_count.get(), 1)
+
+    def test_a_missed_forget_lives_a_minute_at_most(self):
+        make_comment(make_author())
+        queries.top_level_count.get()
+        generation = shared.client().get(queries.TopLevelCount.GENERATION_KEY) or 0
+        self.assertLessEqual(shared.client().ttl(f"top_level_count:{generation}"), 60)
 
     def test_a_count_older_than_a_new_comment_is_not_kept(self):
         author = make_author()

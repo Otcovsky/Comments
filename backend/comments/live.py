@@ -5,11 +5,16 @@ the number of processes and sockets. Which page sizes are open lives in Redis, s
 event from any backend process counts positions for the tables of all of them. A process that
 dies cannot drop its tables, so every process sends heartbeats, and the others drop the
 tables of one that stopped.
+
+Each process also keeps its own tables in memory. When Redis lost them (a restart, a failed
+write, or others dropping a process whose loop stalled), the next heartbeat writes them again,
+so the open pages hear events again within HEARTBEAT_SECONDS of Redis coming back.
 """
 import asyncio
 import logging
 import uuid
 
+import redis
 from channels.layers import get_channel_layer
 
 from . import queries, shared
@@ -68,6 +73,21 @@ redis.call('SET', 'viewers:alive:' .. process, 1, 'EX', ttl)
 DROP = _DROP + """
 drop(ARGV[1], ARGV[2])
 """
+# Replaces every table of this process with the ones it keeps in memory: ARGV[3], ARGV[4] are
+# a channel and its table, and so on.
+RESYNC = _DROP + """
+local process, ttl = ARGV[1], ARGV[2]
+local of = 'viewers:of:' .. process
+for _, channel in ipairs(redis.call('HKEYS', of)) do
+    drop(process, channel)
+end
+for i = 3, #ARGV, 2 do
+    redis.call('HSET', of, ARGV[i], ARGV[i + 1])
+    redis.call('HINCRBY', 'viewers:sizes', string.match(ARGV[i + 1], '^(.+):%d+$'), 1)
+end
+redis.call('SADD', 'viewers:processes', process)
+redis.call('SET', 'viewers:alive:' .. process, 1, 'EX', ttl)
+"""
 # Drops every table of a process unless it is alive; returns how many.
 SWEEP = _DROP + """
 local process = ARGV[1]
@@ -90,15 +110,25 @@ class Viewers:
 
     def __init__(self, process):
         self.process = process
+        self._tables = {}  # channel -> table, what Redis must hold for this process
+        # Redis may differ from _tables: a write failed. The heartbeat then writes them all.
+        self._stale = False
+        # The writes of this process go one at a time, so that a resync cannot cross a show or
+        # a drop on another connection and bring back a channel that is gone.
+        self._locks = {}  # event loop -> its lock
         self._heartbeats = {}  # event loop -> its heartbeat task
 
     async def show(self, channel, ordering, page_size, page):
         self._keep_alive()
         table = f"{ordering}:{page_size}:{page}"
-        await self._run(SHOW, channel, table, PROCESS_TTL_SECONDS)
+        async with self._lock():
+            self._tables[channel] = table
+            await self._write(SHOW, channel, table, PROCESS_TTL_SECONDS)
 
     async def drop(self, channel):
-        await self._run(DROP, channel)
+        async with self._lock():
+            if self._tables.pop(channel, None) is not None:
+                await self._write(DROP, channel)
 
     async def page_sizes(self):
         """Page sizes open right now, by ordering."""
@@ -109,18 +139,38 @@ class Viewers:
         return sizes
 
     async def sweep(self):
-        """Says this process is alive and drops the tables of processes that are not."""
-        redis = shared.aclient()
-        await redis.set(f"viewers:alive:{self.process}", 1, ex=PROCESS_TTL_SECONDS)
+        """Says this process is alive, writes its tables again if Redis lost them, and drops
+        the tables of processes that are not alive."""
+        client = shared.aclient()
+        await client.set(f"viewers:alive:{self.process}", 1, ex=PROCESS_TTL_SECONDS)
+        async with self._lock():
+            if self._stale or await client.hlen(f"viewers:of:{self.process}") != len(self._tables):
+                pairs = [value for item in self._tables.items() for value in item]
+                await client.eval(RESYNC, 0, self.process, PROCESS_TTL_SECONDS, *pairs)
+                self._stale = False
+                logger.info("Wrote again %s viewers of this process", len(self._tables))
         dropped = 0
-        for process in await redis.smembers("viewers:processes"):
+        for process in await client.smembers("viewers:processes"):
             if process != self.process:
-                dropped += await redis.eval(SWEEP, 0, process)
+                dropped += await client.eval(SWEEP, 0, process)
         if dropped:
             logger.info("Dropped %s viewers of stopped processes", dropped)
 
-    async def _run(self, script, *args):
-        await shared.aclient().eval(script, 0, self.process, *args)
+    async def _write(self, script, *args):
+        """A failed write is not the socket's problem: the heartbeat repeats it later."""
+        try:
+            await shared.aclient().eval(script, 0, self.process, *args)
+        except redis.RedisError as error:
+            self._stale = True
+            shared.warn(logger, "Viewports wait for Redis", error)
+
+    def _lock(self):
+        loop = asyncio.get_running_loop()
+        if loop not in self._locks:
+            for closed in [other for other in self._locks if other.is_closed()]:
+                del self._locks[closed]
+            self._locks[loop] = asyncio.Lock()
+        return self._locks[loop]
 
     def _keep_alive(self):
         loop = asyncio.get_running_loop()
@@ -134,6 +184,8 @@ class Viewers:
             await asyncio.sleep(HEARTBEAT_SECONDS)
             try:
                 await self.sweep()
+            except redis.RedisError as error:
+                shared.warn(logger, "Viewers heartbeat waits for Redis", error)
             except Exception:
                 logger.exception("Viewers heartbeat failed")
 

@@ -2,6 +2,9 @@ import ipaddress
 import os
 from pathlib import Path
 
+from redis.asyncio.retry import Retry as AsyncRetry
+from redis.backoff import NoBackoff
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
@@ -38,11 +41,21 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # What every backend process must see the same way: captchas, limits per IP, viewports,
 # the count of top-level comments (comments/shared.py) and the channel layer.
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+# Seconds to connect and to wait for an answer, with one retry at once. Without them a Redis
+# that hangs holds a request, or a DB thread, until it answers (measured: minutes).
+REDIS_OPTIONS = {
+    "socket_connect_timeout": 1,
+    "socket_timeout": 1,
+    "retry": AsyncRetry(NoBackoff(), 1),
+}
 # Pub/sub: an event for a group is one PUBLISH, and each process hands it to its own sockets.
 # The list-based RedisChannelLayer queues every message of a process in one list of 100, which
 # overflowed under load and lost events, and costs a round trip per message to receive.
 CHANNEL_LAYERS = {
-    "default": {"BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer", "CONFIG": {"hosts": [REDIS_URL]}}
+    "default": {
+        "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
+        "CONFIG": {"hosts": [{"address": REDIS_URL, **REDIS_OPTIONS}]},
+    }
 }
 # Redis outlives a test run, so the runner empties it first.
 TEST_RUNNER = "comments.tests.runner.Runner"

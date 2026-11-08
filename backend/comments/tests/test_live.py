@@ -9,7 +9,7 @@ from comments import live, queries
 from comments.live import viewers
 from comments.routing import websocket_urlpatterns
 
-from .helpers import post
+from .helpers import post, redis_down
 
 application = websocket_urlpatterns[0].callback
 QUIET = 0.1
@@ -182,6 +182,15 @@ class SocketTests(TransactionTestCase):
         self.sockets.clear()
         self.assertEqual(await viewers.page_sizes(), {})
         await post()  # nobody watches, and nothing breaks
+
+    async def test_a_zone_sent_while_redis_is_down_is_heard_once_it_is_back(self):
+        socket = await self.connect(page=5)
+        with redis_down():
+            await self.show(socket)  # the first page now, written nowhere
+        await viewers.sweep()  # the next heartbeat
+        comment = await post()
+        self.assertEqual((await socket.receive_json_from())["id"], comment["id"])
+        await self.close()
 
     async def test_broken_events_do_not_fail_the_comment(self):
         socket = await self.connect()
