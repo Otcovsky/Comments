@@ -558,7 +558,7 @@ class PositionTests(TransactionTestCase):
         comment = make_comment(make_author())
         for ordering in ("USERNAME_ASC", "USERNAME_DESC", "EMAIL_ASC", "EMAIL_DESC"):
             with self.subTest(ordering=ordering), CaptureQueriesContext(connection) as captured:
-                queries.positions(comment.pk, [ordering])
+                queries.positions(comment.pk, {ordering: 100})
                 queries.comment_page(1, 25, ordering)
             # The positions and the ids of the page; only the page's own rows join authors.
             sorting = [q["sql"] for q in captured.captured_queries if "home_page" not in q["sql"]]
@@ -578,5 +578,15 @@ class PositionTests(TransactionTestCase):
             order = [row["id"] for row in rows]
             for comment in comments:
                 with self.subTest(ordering=ordering, comment=comment.pk):
-                    found = queries.positions(comment.pk, orderings)
+                    found = queries.positions(comment.pk, dict.fromkeys(orderings, 100))
                     self.assertEqual(found[ordering], order.index(comment.pk))
+
+    def test_position_is_counted_up_to_the_limit(self):
+        author = make_author()
+        comments = [make_comment(author) for _ in range(6)]
+        oldest, newest = comments[0].pk, comments[-1].pk
+        # By date, newest first: the oldest comment has five before it, and ties count too.
+        Comment.objects.update(created_at=datetime(2020, 1, 1, tzinfo=timezone.utc))
+        self.assertEqual(queries.positions(oldest, {"CREATED_AT_DESC": 100}), {"CREATED_AT_DESC": 5})
+        self.assertEqual(queries.positions(oldest, {"CREATED_AT_DESC": 3}), {"CREATED_AT_DESC": 3})
+        self.assertEqual(queries.positions(newest, {"CREATED_AT_DESC": 3}), {"CREATED_AT_DESC": 0})

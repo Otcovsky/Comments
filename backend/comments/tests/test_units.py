@@ -284,6 +284,15 @@ class ViewersTests(SimpleTestCase):
         await viewers.drop("unknown")
         self.assertEqual(await viewers.page_sizes(), {"CREATED_AT_DESC": {10}})
 
+    async def test_furthest_open_page(self):
+        viewers = Viewers("p1")
+        await viewers.show("a", "EMAIL_ASC", 10, 2)
+        await viewers.show("b", "EMAIL_ASC", 10, 5)
+        await viewers.show("c", "EMAIL_ASC", 25, 1)
+        self.assertEqual(await viewers.open_pages(), {"EMAIL_ASC": {10: 5, 25: 1}})
+        await viewers.drop("b")
+        self.assertEqual(await viewers.open_pages(), {"EMAIL_ASC": {10: 2, 25: 1}})
+
     async def test_processes_share_the_tables(self):
         one, two = Viewers("p1"), Viewers("p2")
         await one.show("a", "CREATED_AT_DESC", 25, 1)

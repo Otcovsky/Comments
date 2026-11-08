@@ -25,16 +25,13 @@ ORDERINGS = {
 # top-level row through some other index and filters them, which made a position count or
 # a deep page 20-40 ms instead of 3-5 (EXPLAIN ANALYZE on 10,757 top-level comments).
 INDEXES = {
-    "CREATED_AT_DESC": "comments_co_parent__2efacb_idx",
-    "CREATED_AT_ASC": "comments_co_parent__2efacb_idx",
+    "CREATED_AT_DESC": "comments_top_created_desc",
+    "CREATED_AT_ASC": "comments_top_created_asc",
     "USERNAME_ASC": "comments_top_username_asc",
     "USERNAME_DESC": "comments_top_username_desc",
     "EMAIL_ASC": "comments_top_email_asc",
     "EMAIL_DESC": "comments_top_email_desc",
 }
-# Dates have no index with the ties' -id, so a forced index would sort them all; the plan
-# MySQL picks for them is already fast.
-FORCED_PAGES = ("USERNAME_ASC", "USERNAME_DESC", "EMAIL_ASC", "EMAIL_DESC")
 
 ROW_FIELDS = (
     "id",
@@ -142,11 +139,8 @@ def _page_ids(offset, page_size, ordering):
     # Two steps: the ids of the page from the index alone, then the rows with their reply
     # counts, so that the count subquery runs for these rows only.
     field, descending = ORDERINGS[ordering]
-    if ordering in FORCED_PAGES:
-        order = f"ORDER BY {field} {'DESC' if descending else 'ASC'}, id DESC LIMIT %s OFFSET %s"
-        return [row[0] for row in _top_level_sql(ordering, "SELECT id", order, [page_size, offset])]
-    sorted_ids = _top_level().order_by(f"-{field}" if descending else field, "-id").values_list("pk", flat=True)
-    return list(sorted_ids[offset : offset + page_size])
+    order = f"ORDER BY {field} {'DESC' if descending else 'ASC'}, id DESC LIMIT %s OFFSET %s"
+    return [row[0] for row in _top_level_sql(ordering, "SELECT id", order, [page_size, offset])]
 
 
 def replies(parent_id):
@@ -232,20 +226,30 @@ def save_comment(*, username, email, home_page, parent, text, attachment, attach
     }
 
 
-def positions(comment_id, orderings):
-    """How many top-level comments stand before this one, in each of the orderings."""
-    fields = {ORDERINGS[ordering][0] for ordering in orderings}
+def positions(comment_id, limits):
+    """How many top-level comments stand before this one, in each ordering of `limits`, counted
+    up to the limit given for it. Past the furthest open row of an ordering the comment is on
+    no open page, and counting the rest (hundreds of thousands of rows for an old comment)
+    tells nobody anything."""
+    fields = {ORDERINGS[ordering][0] for ordering in limits}
     values = _top_level().values(*fields).get(pk=comment_id)
     result = {}
-    for ordering in orderings:
+    for ordering, limit in limits.items():
         field, descending = ORDERINGS[ordering]
         # Two counts and no OR: each is a range of the ordering's index, but for the OR of
         # both MySQL reads every top-level row.
         value = values[field]
-        before = _top_level_sql(ordering, "SELECT COUNT(*)", f"AND {field} {'>' if descending else '<'} %s", [value])
-        ties = _top_level_sql(ordering, "SELECT COUNT(*)", f"AND {field} = %s AND id > %s", [value, comment_id])
-        result[ordering] = before[0][0] + ties[0][0]
+        before = _count_up_to(ordering, f"AND {field} {'>' if descending else '<'} %s", [value], limit)
+        ties = 0
+        if before < limit:
+            ties = _count_up_to(ordering, f"AND {field} = %s AND id > %s", [value, comment_id], limit - before)
+        result[ordering] = before + ties
     return result
+
+
+def _count_up_to(ordering, rest, params, limit):
+    rows = _top_level_sql(ordering, "SELECT COUNT(*) FROM (SELECT 1", f"{rest} LIMIT %s) AS counted", [*params, limit])
+    return rows[0][0]
 
 
 def _top_level_sql(ordering, select, rest, params):

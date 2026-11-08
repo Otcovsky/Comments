@@ -1,8 +1,8 @@
 """Who sees what, and which events reach them; see docs/api.md, section 6.
 
 Every open page is a group of the channel layer, so an event for it is one message whatever
-the number of processes and sockets. Which page sizes are open lives in Redis, so that an
-event from any backend process counts positions for the tables of all of them. A process that
+the number of processes and sockets. Which pages are open lives in Redis, so that an event
+from any backend process counts positions for the tables of all of them. A process that
 dies cannot drop its tables, so every process sends heartbeats, and the others drop the
 tables of one that stopped.
 
@@ -42,7 +42,7 @@ def page_group(ordering, page_size, page):
 
 
 # The keys, kept consistent by the scripts below:
-#   viewers:sizes            "<ordering>:<size>" -> channels showing a page of it
+#   viewers:pages            "<ordering>:<size>:<page>" -> channels showing it
 #   viewers:of:<process>     channel -> its table, "<ordering>:<size>:<page>"
 #   viewers:alive:<process>  exists while the process sends heartbeats
 #   viewers:processes        processes that may have tables
@@ -56,9 +56,8 @@ local function drop(process, channel)
         return
     end
     redis.call('HDEL', of, channel)
-    local size = string.match(tbl, '^(.+):%d+$')
-    if redis.call('HINCRBY', 'viewers:sizes', size, -1) <= 0 then
-        redis.call('HDEL', 'viewers:sizes', size)
+    if redis.call('HINCRBY', 'viewers:pages', tbl, -1) <= 0 then
+        redis.call('HDEL', 'viewers:pages', tbl)
     end
 end
 """
@@ -66,7 +65,7 @@ SHOW = _DROP + """
 local process, channel, tbl, ttl = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
 drop(process, channel)
 redis.call('HSET', 'viewers:of:' .. process, channel, tbl)
-redis.call('HINCRBY', 'viewers:sizes', string.match(tbl, '^(.+):%d+$'), 1)
+redis.call('HINCRBY', 'viewers:pages', tbl, 1)
 redis.call('SADD', 'viewers:processes', process)
 redis.call('SET', 'viewers:alive:' .. process, 1, 'EX', ttl)
 """
@@ -83,7 +82,7 @@ for _, channel in ipairs(redis.call('HKEYS', of)) do
 end
 for i = 3, #ARGV, 2 do
     redis.call('HSET', of, ARGV[i], ARGV[i + 1])
-    redis.call('HINCRBY', 'viewers:sizes', string.match(ARGV[i + 1], '^(.+):%d+$'), 1)
+    redis.call('HINCRBY', 'viewers:pages', ARGV[i + 1], 1)
 end
 redis.call('SADD', 'viewers:processes', process)
 redis.call('SET', 'viewers:alive:' .. process, 1, 'EX', ttl)
@@ -130,13 +129,18 @@ class Viewers:
             if self._tables.pop(channel, None) is not None:
                 await self._write(DROP, channel)
 
+    async def open_pages(self):
+        """The furthest page open right now, by ordering and page size."""
+        pages = {}
+        for table in await shared.aclient().hkeys("viewers:pages"):
+            ordering, page_size, page = table.rsplit(":", 2)
+            furthest = pages.setdefault(ordering, {})
+            furthest[int(page_size)] = max(furthest.get(int(page_size), 0), int(page))
+        return pages
+
     async def page_sizes(self):
         """Page sizes open right now, by ordering."""
-        sizes = {}
-        for size in await shared.aclient().hkeys("viewers:sizes"):
-            ordering, page_size = size.rsplit(":", 1)
-            sizes.setdefault(ordering, set()).add(int(page_size))
-        return sizes
+        return {ordering: set(furthest) for ordering, furthest in (await self.open_pages()).items()}
 
     async def sweep(self):
         """Says this process is alive, writes its tables again if Redis lost them, and drops
@@ -227,22 +231,28 @@ async def _send_to_page(comment_id, payload, newest=False):
     A comment just created is the newest one, so by date its place needs no counting: it is
     the first, or the last. Comments posted at the same moment may swap places, which only
     matters at a page boundary, and the clients reload the page anyway."""
-    sizes = await viewers.page_sizes()
-    if not sizes:
+    pages = await viewers.open_pages()
+    if not pages:
         return
     positions = {}
     if newest:
-        if "CREATED_AT_DESC" in sizes:
+        if "CREATED_AT_DESC" in pages:
             positions["CREATED_AT_DESC"] = 0
-        if "CREATED_AT_ASC" in sizes:
+        if "CREATED_AT_ASC" in pages:
             positions["CREATED_AT_ASC"] = await in_db_thread(queries.top_level_count.get) - 1
-    counted = [ordering for ordering in sizes if ordering not in positions]
-    if counted:
-        positions.update(await in_db_thread(queries.positions, comment_id, counted))
+    # Counted up to the end of the furthest open page: a place past it is no open page's,
+    # whatever the page size.
+    limits = {
+        ordering: max(page_size * page for page_size, page in furthest.items())
+        for ordering, furthest in pages.items()
+        if ordering not in positions
+    }
+    if limits:
+        positions.update(await in_db_thread(queries.positions, comment_id, limits))
     layer = get_channel_layer()
     message = {"type": EVENT_HANDLER, "payload": payload}
-    for ordering, page_sizes in sizes.items():
-        for page_size in page_sizes:
+    for ordering, furthest in pages.items():
+        for page_size in furthest:
             await layer.group_send(page_group(ordering, page_size, positions[ordering] // page_size + 1), message)
 
 
