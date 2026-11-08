@@ -1,0 +1,5 @@
+comments-backend-1,backend
+comments-broker-1,broker
+comments-frontend-1,frontend
+comments-redis-1,redis
+comments-worker-1,worker

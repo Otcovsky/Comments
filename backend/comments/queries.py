@@ -54,12 +54,19 @@ def _top_level():
 
 class TopLevelCount:
     """The number of top-level comments. Every page of the list needs it, and counting 10,000
-    index entries costs about as much as the page itself, so it is counted once and forgotten
-    when a top-level comment is saved or any comment deleted (signals in apps.py). It lives in
+    index entries costs about as much as the page itself, so it is counted once, gets one more
+    with a new top-level comment and is forgotten when any comment is deleted (signals in
+    apps.py). It lives in
     Redis, so a comment saved by one backend process is counted by all of them.
 
     A forget moves the generation on, and a count is kept under the generation it started in:
     one that started before a forget lands where nobody reads it.
+
+    A new top-level comment moves the generation on too (the pages cached under it shift by
+    a row), but carries the count over, one more, instead of leaving it to be counted again:
+    at 200,000 top-level comments a count took 50-500 ms of the database's single core. The
+    carried count keeps the expiry of the counted one, so a count that is off (a reader that
+    counted the new row just before the carry) is counted afresh within TTL_SECONDS.
 
     Without Redis the list still works: the count comes from the database. A forget that
     fails must not fail the comment already saved (or a migration), so it is only logged; the
@@ -67,6 +74,16 @@ class TopLevelCount:
 
     GENERATION_KEY = cache.GENERATION_KEY
     TTL_SECONDS = cache.TTL_SECONDS
+    _ADD_ONE = """
+local generation = redis.call('GET', KEYS[1]) or '0'
+local counted = 'top_level_count:' .. generation
+local count = redis.call('GET', counted)
+local ttl = redis.call('PTTL', counted)
+local next = redis.call('INCR', KEYS[1])
+if count and ttl > 0 then
+    redis.call('SET', 'top_level_count:' .. next, tostring(tonumber(count) + 1), 'PX', ttl)
+end
+"""
 
     def get(self):
         try:
@@ -88,6 +105,13 @@ class TopLevelCount:
     def forget(self, **kwargs):
         try:
             shared.client().incr(self.GENERATION_KEY)
+        except redis.RedisError as error:
+            shared.warn(logger, "Could not forget the top-level count", error)
+
+    def add_one(self):
+        """A top-level comment was saved."""
+        try:
+            shared.client().eval(self._ADD_ONE, 1, self.GENERATION_KEY)
         except redis.RedisError as error:
             shared.warn(logger, "Could not forget the top-level count", error)
 

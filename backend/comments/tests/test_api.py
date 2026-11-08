@@ -411,9 +411,30 @@ class TopLevelCountTests(TransactionTestCase):
         with self.assertNumQueries(0):
             self.assertEqual(queries.top_level_count.get(), 1)
         make_comment(author)
-        self.assertEqual(queries.top_level_count.get(), 2)
+        with self.assertNumQueries(0):
+            self.assertEqual(queries.top_level_count.get(), 2)
         root.delete()
         self.assertEqual(queries.top_level_count.get(), 1)
+
+    def test_a_new_comment_carries_the_count_without_extending_its_life(self):
+        author = make_author()
+        make_comment(author)
+        queries.top_level_count.get()
+        client = shared.client()
+        old = int(client.get(queries.TopLevelCount.GENERATION_KEY) or 0)
+        client.pexpire(f"top_level_count:{old}", 5000)
+        make_comment(author)
+        new = int(client.get(queries.TopLevelCount.GENERATION_KEY))
+        self.assertEqual(new, old + 1)
+        self.assertEqual(client.get(f"top_level_count:{new}"), "2")
+        self.assertLessEqual(client.pttl(f"top_level_count:{new}"), 5000)
+
+    def test_a_new_comment_without_a_count_leaves_it_to_be_counted(self):
+        author = make_author()
+        make_comment(author)
+        make_comment(author)
+        with self.assertNumQueries(1):
+            self.assertEqual(queries.top_level_count.get(), 2)
 
     def test_without_redis_it_is_counted_every_time_and_a_forget_does_not_fail(self):
         make_comment(make_author())

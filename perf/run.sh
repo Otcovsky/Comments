@@ -11,6 +11,8 @@
 #   perf/run.sh day   <label> [rate]           # peak hour of 100k visitors a day (docs/scaling.md)
 #
 # Outside the suite, k6 variables can be overridden from the environment, e.g. DURATION=2m.
+# RESET=0 keeps the data of the previous run: restoring a million comments takes a quarter
+# of an hour and keeps the database busy for a while after.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -27,7 +29,7 @@ suite | smoke | load | soak | step | upload | day) ;;
 *) sed -n '2,13p' "$0" >&2; exit 2 ;;
 esac
 
-OVERRIDES=$(env | grep -E '^(DURATION|WARMUP|WS_CLIENTS|VIEWERS|WS_PER_VU|RATE|SLO_P95|SEED|USE_TOKEN)=' | tr '\n' ' ' || true)
+OVERRIDES=$(env | grep -E '^(DURATION|WARMUP|WS_CLIENTS|VIEWERS|WS_PER_VU|RATE|SLO_P95|SEED|USE_TOKEN|RESET)=' | tr '\n' ' ' || true)
 if [ "$MODE" = suite ] && [ -n "$OVERRIDES" ]; then
     echo "The suite runs with fixed settings; unset: $OVERRIDES" >&2
     exit 2
@@ -79,7 +81,7 @@ trap stop_stats EXIT
 # Sets K6_CODE (0 = passed, 99 = SLO broken).
 # Never called from a condition: bash would silently turn off `set -e` inside it.
 run_once() {
-    local dir=$1 rate=$2 profile=$3 reset=${4:-1} code=0
+    local dir=$1 rate=$2 profile=$3 reset=${4:-${RESET:-1}} code=0
     mkdir -p "$dir"
     echo "== $profile at $rate it/s -> ${dir#"$HERE"/}"
     if [ "$reset" = 1 ]; then
@@ -127,7 +129,7 @@ run_once() {
 
 # Rates in order, STEP_DURATION each, until the SLO breaks. The data is reset before the first.
 run_steps() {
-    local dir=$1 reset=1
+    local dir=$1 reset=${RESET:-1}
     shift
     local DURATION=${DURATION:-$STEP_DURATION} WARMUP=${WARMUP:-$STEP_WARMUP} VIEWERS=${VIEWERS:-$STEP_VIEWERS}
     export DURATION WARMUP VIEWERS
