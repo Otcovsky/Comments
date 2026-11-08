@@ -13,8 +13,10 @@ const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZE_KEY = "comments.pageSize";
 const DEFAULT_ORDERING = "-created_at"; // LIFO
 // Everyone on a page hears about a new comment at once: a random delay spreads their
-// reloads out, and the comments that arrive during it share one reload.
-const LIVE_RELOAD_MAX_DELAY_MS = 1000;
+// reloads out, and the comments that arrive during it share one reload. With a second, the
+// 850 open first pages of the peak hour reloaded in a burst that filled both cores of the
+// server for its duration (docs/scaling.md).
+const LIVE_RELOAD_MAX_DELAY_MS = 5000;
 
 function loadPageSize() {
   try {

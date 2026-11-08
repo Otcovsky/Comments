@@ -19,7 +19,8 @@ import { summarize } from "./lib/summary.js";
 // 2: GraphQL API, threads unfolded level by level, a WebSocket viewport per tab.
 // 3: the same behaviour in shorter runs, one reset for all steps (suite.env), and VUs
 // created before the run.
-export const SUITE_VERSION = 3;
+// 4: tabs spread their reloads over 5 s instead of 1 s, as App.jsx does now.
+export const SUITE_VERSION = 4;
 
 const env = (name, fallback) => __ENV[name] || fallback;
 
@@ -89,7 +90,7 @@ const MAX_UNFOLD_LEVELS = 3;
 const ATTACH_READY_TIMEOUT = 10;
 // App.jsx: a tab reloads its page after a random delay up to this, and the comments that
 // arrive meanwhile share that one reload.
-const LIVE_RELOAD_MAX_DELAY_MS = 1000;
+const LIVE_RELOAD_MAX_DELAY_MS = 5000;
 // What each tab shows, by its index (repeats after ten): page, ordering and the row whose
 // thread is open (null: none). Half of them sit on the first page, as most visitors do.
 const VIEWS = [
