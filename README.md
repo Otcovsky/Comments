@@ -72,5 +72,6 @@ docker compose --env-file ../comments.env up -d --build
 |---|---|
 | `docs/api.md` | Контракт API: GraphQL, WebSocket, ошибки, правила для вложений |
 | `docs/db_schema.sql` | Схема базы данных, открывается в MySQL Workbench |
+| `docs/scaling.md` | Миллион сообщений и 100 000 пользователей в сутки: расчёт нагрузки, нагрузочный тест, замеры и план роста |
 | `perf/README.md` | Нагрузочные тесты на k6 и как их запускать |
 | `perf/results/OPTIMIZATIONS.md` | Что меняли ради производительности и что показали замеры |

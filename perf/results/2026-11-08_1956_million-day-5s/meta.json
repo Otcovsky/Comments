@@ -1,0 +1,12 @@
+{
+  "label": "million-day-5s",
+  "mode": "day",
+  "suite_version": 4,
+  "started_at": "2026-11-08T17:56:11Z",
+  "local_git_sha": "04385ede39539a2b94c94c3826bfa94296aa8811",
+  "local_git_dirty_files": 1,
+  "app": {"git_sha": "04385ede39539a2b94c94c3826bfa94296aa8811", "git_dirty_files": null, "images": [{"ID":"sha256:acd7b2632b6fff7171221aedda6522786af6584445829f5ecdc62d0344bc0fbb","ContainerName":"comments-worker-1","Repository":"comments-backend","Tag":"latest","Platform":"linux/arm64","Size":187734888,"LastTagTime":"2026-11-08T17:55:46.315369355Z"},{"ID":"sha256:acd7b2632b6fff7171221aedda6522786af6584445829f5ecdc62d0344bc0fbb","ContainerName":"comments-migrate-1","Repository":"comments-backend","Tag":"latest","Platform":"linux/arm64","Size":187734888,"LastTagTime":"2026-11-08T17:55:46.315369355Z"},{"ID":"sha256:acd7b2632b6fff7171221aedda6522786af6584445829f5ecdc62d0344bc0fbb","ContainerName":"comments-backend-1","Repository":"comments-backend","Tag":"latest","Platform":"linux/arm64","Size":187734888,"LastTagTime":"2026-11-08T17:55:46.315369355Z"},{"ID":"sha256:9b303d43b18c13e991205ea3a1e2bda79005103e4fdffd3953254e4a5f3826af","ContainerName":"comments-frontend-1","Repository":"comments-frontend","Tag":"latest","Platform":"linux/arm64","Size":22122203,"LastTagTime":"2026-11-08T17:55:52.896716335Z"},{"ID":"sha256:fe9daae35cd4fd6ec22416aa4fe0cf6b3e36741e06ff45b9986253fe2a81c041","ContainerName":"comments-redis-1","Repository":"redis","Tag":"8.2-alpine","Platform":"linux/arm64/v8","Size":27881486,"LastTagTime":"2026-11-08T10:22:23.216743609Z"},{"ID":"sha256:425307007e5a54b20fe6b6da718c2e385999eddda28d44d329b7e7bfabe45610","ContainerName":"comments-broker-1","Repository":"rabbitmq","Tag":"4.1-alpine","Platform":"linux/arm64/v8","Size":82203201,"LastTagTime":"2026-11-08T10:22:26.917096943Z"}]},
+  "k6": "k6 v2.3.0 (commit/e088784614, go1.26.8, linux/arm64)",
+  "seed_args": "--top 200000 --replies 800000 --authors 100000 --seed 42",
+  "env_overrides": "RESET=0 "
+}
