@@ -1,7 +1,9 @@
 import ipaddress
 import logging
+import time
 from unittest import mock
 
+import jwt
 import redis
 
 from django.test import SimpleTestCase, override_settings
@@ -197,10 +199,29 @@ class TokenTests(SimpleTestCase):
         for header in (None, "", "Bearer", "Bearer x", "Basic abc"):
             self.assertFalse(tokens.allows(header, "bob", "a@b.io"))
 
+    def test_is_a_jwt(self):
+        token = tokens.issue("bob", "a@b.io")
+        self.assertEqual(jwt.get_unverified_header(token)["alg"], "HS256")
+        claims = jwt.decode(token, options={"verify_signature": False})
+        self.assertEqual((claims["sub"], claims["email"], claims["aud"]), ("bob", "a@b.io", "comments.author"))
+        self.assertEqual(claims["exp"] - claims["iat"], 3600)
+
     def test_expires(self):
-        header = f"Bearer {tokens.issue('bob', 'a@b.io')}"
         with override_settings(AUTHOR_TOKEN_TTL=-1):
-            self.assertFalse(tokens.allows(header, "bob", "a@b.io"))
+            header = f"Bearer {tokens.issue('bob', 'a@b.io')}"
+        self.assertFalse(tokens.allows(header, "bob", "a@b.io"))
+
+    def test_forged(self):
+        now = int(time.time())
+        claims = {"sub": "bob", "email": "a@b.io", "aud": "comments.author", "iat": now, "exp": now + 60}
+        forged = (
+            jwt.encode(claims, "another key that is long enough for HS256", algorithm="HS256"),
+            jwt.encode(claims, None, algorithm="none"),
+            jwt.encode({**claims, "aud": "elsewhere"}, tokens._key(), algorithm="HS256"),
+            jwt.encode({k: v for k, v in claims.items() if k != "exp"}, tokens._key(), algorithm="HS256"),
+        )
+        for token in forged:
+            self.assertFalse(tokens.allows(f"Bearer {token}", "bob", "a@b.io"))
 
 
 class ViewportTests(SimpleTestCase):

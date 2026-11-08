@@ -111,7 +111,7 @@ type Mutation {
 
 ### Токен вместо капчи
 
-После решённой капчи `createComment` возвращает `token` и `tokenExpiresIn`. Токен привязан к паре `username` + `email`. Клиент шлёт его в заголовке `Authorization: Bearer <token>` и тогда не передаёт капчу. Токен живёт 1 час и не продлевается. Если токен просрочен или не подходит, сервер отвечает ошибкой `VALIDATION` с полем `captchaValue`, и клиент снова показывает капчу.
+После решённой капчи `createComment` возвращает `token` и `tokenExpiresIn`. Токен — JWT (HS256, `backend/comments/tokens.py`): в `sub` лежит `username`, в `email` — email, ещё `aud`, `iat` и `exp`. Ключ выводится из `DJANGO_SECRET_KEY`. Токен привязан к паре `username` + `email`. Клиент шлёт его в заголовке `Authorization: Bearer <token>` и тогда не передаёт капчу. Токен живёт 1 час и не продлевается. Если токен просрочен или не подходит, сервер отвечает ошибкой `VALIDATION` с полем `captchaValue`, и клиент снова показывает капчу.
 
 ## 3. Ошибки
 
