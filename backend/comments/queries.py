@@ -6,7 +6,7 @@ from django.db import connection
 from django.db.models import Count, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 
-from . import shared
+from . import cache, shared
 from .models import Author, Comment
 
 logger = logging.getLogger(__name__)
@@ -68,8 +68,8 @@ class TopLevelCount:
     fails must not fail the comment already saved (or a migration), so it is only logged; the
     count it missed lives TTL_SECONDS at most."""
 
-    GENERATION_KEY = "top_level_count:generation"
-    TTL_SECONDS = 60
+    GENERATION_KEY = cache.GENERATION_KEY
+    TTL_SECONDS = cache.TTL_SECONDS
 
     def get(self):
         try:
@@ -80,7 +80,7 @@ class TopLevelCount:
 
     def _cached(self):
         r = shared.client()
-        key = f"top_level_count:{r.get(self.GENERATION_KEY) or 0}"
+        key = cache.count_key(r.get(self.GENERATION_KEY) or 0)
         value = r.get(key)
         if value is not None:
             return int(value)
@@ -108,28 +108,93 @@ def _with_reply_count(comments):
 
 
 def comment_page(page, page_size, ordering):
-    """Returns (count of top-level comments, rows of the page). Past the end there are no rows."""
-    count = top_level_count.get()
+    """Returns (count of top-level comments, rows of the page). Past the end there are no rows.
+    The count and the ids of the page come from the cache while no top-level comment is added
+    or deleted, the rows while they are kept (cache.py)."""
+    try:
+        epoch, generation, count, ids = cache.page(ordering, page_size, page)
+    except redis.RedisError as error:
+        shared.warn(logger, "Comments from the database, Redis failed", error)
+        return _page_from_database(page, page_size, ordering)
+    counted = count is None
+    if counted:
+        count = _top_level().count()
+    offset = (page - 1) * page_size
+    listed = ids is None and offset < count
+    if listed:
+        ids = _page_ids(offset, page_size, ordering)
+    if counted or listed:
+        _keep(cache.store_page, epoch, generation, ordering, page_size, page, count if counted else None, ids if listed else None)
+    if offset >= count:
+        return count, []
+    return count, _rows(ids)
+
+
+def _page_from_database(page, page_size, ordering):
+    count = _top_level().count()
     offset = (page - 1) * page_size
     if offset >= count:
         return count, []
-    field, descending = ORDERINGS[ordering]
+    return count, _rows_from_database(_page_ids(offset, page_size, ordering))
+
+
+def _page_ids(offset, page_size, ordering):
     # Two steps: the ids of the page from the index alone, then the rows with their reply
     # counts, so that the count subquery runs for these rows only.
+    field, descending = ORDERINGS[ordering]
     if ordering in FORCED_PAGES:
         order = f"ORDER BY {field} {'DESC' if descending else 'ASC'}, id DESC LIMIT %s OFFSET %s"
-        ids = [row[0] for row in _top_level_sql(ordering, "SELECT id", order, [page_size, offset])]
-    else:
-        sorted_ids = _top_level().order_by(f"-{field}" if descending else field, "-id").values_list("pk", flat=True)
-        ids = list(sorted_ids[offset : offset + page_size])
-    rows = _with_reply_count(Comment.objects.filter(pk__in=ids)).values(*ROW_FIELDS)
-    by_id = {row["id"]: row for row in rows}
-    return count, [by_id[comment_id] for comment_id in ids]
+        return [row[0] for row in _top_level_sql(ordering, "SELECT id", order, [page_size, offset])]
+    sorted_ids = _top_level().order_by(f"-{field}" if descending else field, "-id").values_list("pk", flat=True)
+    return list(sorted_ids[offset : offset + page_size])
 
 
 def replies(parent_id):
+    try:
+        epoch, version, ids = cache.children(parent_id)
+    except redis.RedisError as error:
+        shared.warn(logger, "Replies from the database, Redis failed", error)
+        return _replies_from_database(parent_id)
+    if ids is None:
+        ids = list(Comment.objects.filter(parent_id=parent_id).order_by("-created_at", "-id").values_list("pk", flat=True))
+        _keep(cache.store_children, epoch, version, parent_id, ids)
+    return _rows(ids)
+
+
+def _replies_from_database(parent_id):
     rows = _with_reply_count(Comment.objects.filter(parent_id=parent_id)).order_by("-created_at", "-id")
     return list(rows.values(*ROW_FIELDS))
+
+
+def _rows(ids):
+    """The rows of these comments in this order; a comment deleted meanwhile is left out."""
+    if not ids:
+        return []
+    try:
+        epoch, versions, found = cache.rows(ids)
+    except redis.RedisError as error:
+        shared.warn(logger, "Comments from the database, Redis failed", error)
+        return _rows_from_database(ids)
+    missing = [comment_id for comment_id in ids if comment_id not in found]
+    if missing:
+        fetched = _rows_from_database(missing)
+        found.update((row["id"], row) for row in fetched)
+        _keep(cache.store_rows, epoch, versions, fetched)
+    return [found[comment_id] for comment_id in ids if comment_id in found]
+
+
+def _rows_from_database(ids):
+    rows = _with_reply_count(Comment.objects.filter(pk__in=ids)).values(*ROW_FIELDS)
+    by_id = {row["id"]: row for row in rows}
+    return [by_id[comment_id] for comment_id in ids if comment_id in by_id]
+
+
+def _keep(store, *args):
+    """Writes to the cache; the answer is already read, so a failure only costs a miss."""
+    try:
+        store(*args)
+    except redis.RedisError as error:
+        shared.warn(logger, "Could not keep comments in the cache", error)
 
 
 def find_parent(comment_id):

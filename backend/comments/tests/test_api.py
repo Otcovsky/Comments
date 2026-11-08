@@ -12,7 +12,7 @@ from django.test import AsyncClient, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from PIL import Image
 
-from comments import captcha, live, queries, ratelimit, shared
+from comments import cache, captcha, live, queries, ratelimit, shared
 from comments.models import Author, Comment
 
 from .helpers import (
@@ -428,6 +428,107 @@ class TopLevelCountTests(TransactionTestCase):
         with mock.patch.object(queries, "_top_level", count_while_another_comment_is_saved):
             self.assertEqual(queries.top_level_count.get(), 1)
         self.assertEqual(queries.top_level_count.get(), 2)
+
+
+class CacheTests(TransactionTestCase):
+    """The cache answers what the database would, and a write is seen by the next read."""
+
+    def setUp(self):
+        self.ann = make_author("ann", "ann@example.com")
+
+    def page(self, page=1, page_size=25, ordering="CREATED_AT_DESC"):
+        return queries.comment_page(page, page_size, ordering)
+
+    def test_a_page_read_again_needs_no_database(self):
+        first = make_comment(self.ann, attachment="attachments/2026/11/a.jpg", attachment_type="image")
+        make_comment(self.ann, parent=first)
+        cold = self.page()
+        with self.assertNumQueries(0):
+            warm = self.page()
+        self.assertEqual(warm, cold)
+        self.assertEqual(warm[1][0]["reply_count"], 1)
+        self.assertEqual(warm[1][0]["created_at"], first.created_at)
+        cold = queries.replies(first.pk)
+        with self.assertNumQueries(0):
+            self.assertEqual(queries.replies(first.pk), cold)
+
+    def test_cached_rows_are_the_rows_of_the_database(self):
+        root = make_comment(make_author("bob", "bob@example.com", "https://bob.io"), text="<i>x</i>")
+        make_comment(self.ann, parent=root)
+        self.page()
+        self.assertEqual(self.page(), queries._page_from_database(1, 25, "CREATED_AT_DESC"))
+        queries.replies(root.pk)
+        self.assertEqual(queries.replies(root.pk), queries._replies_from_database(root.pk))
+
+    def test_a_new_top_level_comment_is_on_the_next_read(self):
+        make_comment(self.ann)
+        self.page()
+        new = make_comment(self.ann)
+        count, rows = self.page()
+        self.assertEqual((count, rows[0]["id"]), (2, new.pk))
+
+    def test_a_new_reply_is_seen_and_other_branches_stay_cached(self):
+        first, second = make_comment(self.ann), make_comment(self.ann)
+        self.page()
+        queries.replies(first.pk)
+        queries.replies(second.pk)
+        reply = make_comment(self.ann, parent=first)
+        by_id = {row["id"]: row for row in self.page()[1]}
+        self.assertEqual((by_id[first.pk]["reply_count"], by_id[second.pk]["reply_count"]), (1, 0))
+        self.assertEqual([row["id"] for row in queries.replies(first.pk)], [reply.pk])
+        with self.assertNumQueries(0):
+            queries.replies(second.pk)
+
+    def test_a_reply_saved_while_its_branch_is_read_is_not_lost(self):
+        root = make_comment(self.ann)
+        real = queries._rows_from_database
+
+        def read_then_reply(ids):
+            rows = real(ids)  # the count is read before the reply is saved
+            make_comment(self.ann, parent=root)
+            return rows
+
+        with mock.patch.object(queries, "_rows_from_database", read_then_reply):
+            self.assertEqual(self.page()[1][0]["reply_count"], 0)
+        self.assertEqual(self.page()[1][0]["reply_count"], 1)
+
+    def test_a_comment_saved_while_a_page_is_read_is_not_lost(self):
+        make_comment(self.ann)
+        real = queries._page_ids
+
+        def list_then_post(*args):
+            ids = real(*args)
+            make_comment(self.ann)
+            return ids
+
+        with mock.patch.object(queries, "_page_ids", list_then_post):
+            self.assertEqual(len(self.page()[1]), 1)
+        self.assertEqual(len(self.page()[1]), 2)
+
+    def test_deleted_comments_are_gone(self):
+        root = make_comment(self.ann)
+        reply = make_comment(self.ann, parent=root)
+        self.page()
+        queries.replies(root.pk)
+        reply.delete()
+        self.assertEqual(queries.replies(root.pk), [])
+        self.assertEqual(self.page()[1][0]["reply_count"], 0)
+        root.delete()
+        self.assertEqual(self.page(), (0, []))
+
+    def test_a_flushed_database_meets_no_old_rows(self):
+        make_comment(self.ann, text="old")
+        self.page()
+        Comment.objects.update(text="new")  # as rows of a new database with the same ids
+        cache.forget_all()
+        self.assertEqual(self.page()[1][0]["text"], "new")
+
+    def test_without_redis_replies_come_from_the_database(self):
+        root = make_comment(self.ann)
+        make_comment(self.ann, parent=root)
+        with redis_down():
+            self.assertEqual(len(queries.replies(root.pk)), 1)
+            self.assertEqual(self.page()[1][0]["reply_count"], 1)
 
 
 class PositionTests(TransactionTestCase):
