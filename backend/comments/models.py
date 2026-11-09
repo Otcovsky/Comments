@@ -51,10 +51,13 @@ class Comment(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["parent", "-created_at"]),
             models.Index(fields=["root", "created_at"]),
-            # Top-level comments by name and e-mail, ties to the newer id (queries.ORDERINGS),
-            # one index per direction: MySQL cannot read one index backwards for both.
+            # Top-level comments in every ordering, ties to the newer id (queries.ORDERINGS),
+            # one index per direction: MySQL cannot read one index backwards for both. Without
+            # the id a page by date sorted every top-level row: 300 ms at 200,000 of them.
+            # The first one also serves the replies of a comment, newest first.
+            models.Index(fields=["parent", "-created_at", "-id"], name="comments_top_created_desc"),
+            models.Index(fields=["parent", "created_at", "-id"], name="comments_top_created_asc"),
             models.Index(fields=["parent", "username", "-id"], name="comments_top_username_asc"),
             models.Index(fields=["parent", "-username", "-id"], name="comments_top_username_desc"),
             models.Index(fields=["parent", "email", "-id"], name="comments_top_email_asc"),

@@ -19,7 +19,8 @@ import { summarize } from "./lib/summary.js";
 // 2: GraphQL API, threads unfolded level by level, a WebSocket viewport per tab.
 // 3: the same behaviour in shorter runs, one reset for all steps (suite.env), and VUs
 // created before the run.
-export const SUITE_VERSION = 3;
+// 4: tabs spread their reloads over 5 s instead of 1 s, as App.jsx does now.
+export const SUITE_VERSION = 4;
 
 const env = (name, fallback) => __ENV[name] || fallback;
 
@@ -29,6 +30,18 @@ const PROFILES = {
   soak: { rate: 4, duration: "30m", warmup: "30s", wsClients: 50, viewers: 10 },
   // Only uploads, so their latency gets enough samples to compare.
   upload: { rate: 2, duration: "3m", warmup: "15s", wsClients: 0, viewers: 0 },
+  // The peak hour of 100,000 visitors a day (docs/scaling.md): 10,000 visitors an hour,
+  // 8 reads each, one in ten writes a comment, and a tab stays open 10 minutes. Every open
+  // tab reacts to events as the browser does. Not part of the suite.
+  day: {
+    rate: 23,
+    duration: "10m",
+    warmup: "2m",
+    wsClients: 1700,
+    viewers: 1700,
+    wsPerVu: 20,
+    mix: { list: 0.59, thread: 0.395, write: 0.01, attach: 0.0025, preview: 0.0025 },
+  },
 };
 const PROFILE = env("PROFILE", "smoke");
 const defaults = PROFILES[PROFILE];
@@ -45,6 +58,12 @@ const WS_CLIENTS = Number(env("WS_CLIENTS", defaults.wsClients));
 // Listeners that also behave like an open browser tab: they reload what they show on
 // events, as the frontend does. The rest only report their viewport and count events.
 const VIEWERS = Math.min(WS_CLIENTS, Number(env("VIEWERS", defaults.viewers)));
+// Connections per VU: a VU is a JavaScript runtime of its own, and thousands of them would
+// not fit in the load machine's memory, while one VU holds many sockets.
+const WS_PER_VU = Number(env("WS_PER_VU", defaults.wsPerVu || 1));
+// With many connections per VU they open one by one over most of the warmup, as visitors
+// arrive, instead of thousands at the same moment.
+const WS_RAMP_MS = WS_PER_VU > 1 ? seconds(WARMUP) * 750 : 0;
 const SLO_P95 = Number(env("SLO_P95", 500));
 // Must match `manage.py seed_perf`: ids 1..TOTAL, the first TOP are top-level.
 const TOP = Number(env("TOP", 10000));
@@ -59,9 +78,8 @@ const PAGE_SIZE = 25;
 const DEFAULT_ORDERING = "CREATED_AT_DESC";
 // Share of RATE per scenario. A write is two requests: captcha + post.
 const MIX =
-  PROFILE === "upload"
-    ? { attach: 1 }
-    : { list: 0.6, thread: 0.25, write: 0.1, preview: 0.03, attach: 0.02 };
+  defaults.mix ||
+  (PROFILE === "upload" ? { attach: 1 } : { list: 0.6, thread: 0.25, write: 0.1, preview: 0.03, attach: 0.02 });
 // Like the browser: a thread shows its images right away, a text file opens on click.
 const TEXT_OPEN_SHARE = 0.2;
 // A reader of a thread unfolds a reply that has replies of its own with this chance, and
@@ -72,7 +90,7 @@ const MAX_UNFOLD_LEVELS = 3;
 const ATTACH_READY_TIMEOUT = 10;
 // App.jsx: a tab reloads its page after a random delay up to this, and the comments that
 // arrive meanwhile share that one reload.
-const LIVE_RELOAD_MAX_DELAY_MS = 1000;
+const LIVE_RELOAD_MAX_DELAY_MS = 5000;
 // What each tab shows, by its index (repeats after ten): page, ordering and the row whose
 // thread is open (null: none). Half of them sit on the first page, as most visitors do.
 const VIEWS = [
@@ -164,7 +182,7 @@ if (WS_CLIENTS > 0) {
   scenarios.ws = {
     executor: "per-vu-iterations",
     exec: "listen",
-    vus: WS_CLIENTS,
+    vus: Math.ceil(WS_CLIENTS / WS_PER_VU),
     iterations: 1,
     maxDuration: `${seconds(WARMUP) + seconds(DURATION) + 30}s`,
     tags: { phase: "ws" },
@@ -549,8 +567,20 @@ function react(tab, event, heardAt) {
   });
 }
 
+// The VU's connections: every VUs-th index from its own, so each VU gets a share of every
+// view and the ramp opens them in index order.
 export function listen() {
-  const index = exec.scenario.iterationInTest;
+  const vus = Math.ceil(WS_CLIENTS / WS_PER_VU);
+  // Stay connected until the HTTP scenarios have finished.
+  const closeAt = exec.scenario.startTime + (seconds(WARMUP) + seconds(DURATION) + 5) * 1000;
+  for (let index = exec.scenario.iterationInTest; index < WS_CLIENTS; index += vus) {
+    const delay = (WS_RAMP_MS * index) / WS_CLIENTS;
+    if (delay > 0) setTimeout(() => connect(index, closeAt), delay);
+    else connect(index, closeAt);
+  }
+}
+
+function connect(index, closeAt) {
   const tab = openTab(index);
   const front = showsFront(index);
   const ws = new WebSocket(`${BASE_URL.replace(/^http/, "ws")}/ws/comments/`, null, {
@@ -565,8 +595,7 @@ export function listen() {
     if (index < VIEWERS) react(tab, event, heardAt);
   };
   ws.onerror = () => wsErrors.add(1);
-  // Stay connected until the HTTP scenarios have finished.
-  setTimeout(() => ws.close(), (seconds(WARMUP) + seconds(DURATION) + 5) * 1000);
+  setTimeout(() => ws.close(), closeAt - Date.now());
 }
 
 export function handleSummary(data) {
@@ -577,6 +606,7 @@ export function handleSummary(data) {
     duration: DURATION,
     warmup: WARMUP,
     ws_clients: WS_CLIENTS,
+    ws_per_vu: WS_PER_VU,
     ws_front: frontConnections,
     viewers: VIEWERS,
     seed: SEED,

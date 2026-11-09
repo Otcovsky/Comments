@@ -16,7 +16,7 @@ class CommentsConfig(AppConfig):
             if not created:
                 return
             if instance.parent_id is None:
-                queries.top_level_count.forget()
+                queries.top_level_count.add_one()
             else:
                 cache.forget_replies(instance.parent_id)
 
