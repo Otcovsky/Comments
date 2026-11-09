@@ -79,11 +79,11 @@ function CompactSort({ ordering, onSort }) {
   );
 }
 
-function AttachmentMark() {
+function AttachmentMark({ name }) {
   return (
-    <span className="ml-1.5 inline-flex align-[-2px] text-muted" title="Есть вложение">
+    <span className="ml-1.5 inline-flex align-[-2px] text-muted" title={name ? `Вложение: ${name}` : "Есть вложение"}>
       <Paperclip className="size-3.5" aria-hidden="true" />
-      <span className="sr-only">(есть вложение)</span>
+      <span className="sr-only">{name ? `(вложение: ${name})` : "(есть вложение)"}</span>
     </span>
   );
 }
@@ -163,7 +163,7 @@ export default function CommentsTable({ comments, ordering, onSort, thread }) {
                         </div>
                         <p className="mt-0.5 line-clamp-2 text-muted md:hidden">
                           {text}
-                          {comment.attachment && <AttachmentMark />}
+                          {comment.attachment && <AttachmentMark name={comment.attachmentName} />}
                         </p>
                       </div>
                     </div>
@@ -179,7 +179,7 @@ export default function CommentsTable({ comments, ordering, onSort, thread }) {
                   <td className="hidden min-w-56 px-4 py-3.5 md:table-cell">
                     <p className="line-clamp-2 text-fg/85">
                       {text}
-                      {comment.attachment && <AttachmentMark />}
+                      {comment.attachment && <AttachmentMark name={comment.attachmentName} />}
                     </p>
                   </td>
                   <td className="py-3.5 pr-4 pl-2 text-right">

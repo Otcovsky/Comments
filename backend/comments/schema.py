@@ -48,6 +48,7 @@ class Comment:
     home_page: str
     text: str
     attachment: str | None
+    attachment_name: str | None
     attachment_type: AttachmentType | None
     created_at: str
     reply_count: int
@@ -63,6 +64,8 @@ class Comment:
             home_page=row["author__home_page"],
             text=row["text"],
             attachment=f"/media/{row['attachment']}" if row["attachment"] else None,
+            # .get: a process of the previous release may still put rows without it in the cache.
+            attachment_name=row.get("attachment_name") or None,
             attachment_type=AttachmentType(row["attachment_type"]) if row["attachment_type"] else None,
             created_at=row["created_at"].isoformat(),
             reply_count=row["reply_count"],
@@ -133,7 +136,7 @@ async def _check_captcha(input, username, email, authorization):
 
 def _store_attachment(upload):
     file = attachments.process(upload)
-    return storage.put(file), file.kind
+    return storage.put(file), file.kind, attachments.display_name(upload.name, file.extension)
 
 
 async def _save_attachment(upload):
@@ -217,7 +220,9 @@ class Mutation:
         if errors:
             raise ApiError("VALIDATION", errors)
 
-        path, kind = await _save_attachment(attachment) if attachment else ("", CommentModel.AttachmentType.NONE)
+        path, kind, name = (
+            await _save_attachment(attachment) if attachment else ("", CommentModel.AttachmentType.NONE, "")
+        )
 
         try:
             row = await in_db_thread(
@@ -228,6 +233,7 @@ class Mutation:
                 parent=parent,
                 text=text,
                 attachment=path,
+                attachment_name=name,
                 attachment_type=kind,
                 ip_address=_client_address(request),
                 user_agent=request.headers.get("User-Agent", "")[:255],

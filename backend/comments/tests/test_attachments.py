@@ -173,3 +173,33 @@ class TextTests(SimpleTestCase):
         for content in (b"", b"  \n\t ", b"\xef\xbb\xbf"):
             with self.subTest(content), self.assertRaises(AttachmentError):
                 process(upload("a.txt", content))
+
+
+class DisplayNameTests(SimpleTestCase):
+    def test_name_is_kept(self):
+        self.assertEqual(attachments.display_name("Отпуск в горах.jpg", "jpg"), "Отпуск в горах.jpg")
+
+    def test_extension_is_the_stored_one(self):
+        self.assertEqual(attachments.display_name("photo.JPEG", "jpg"), "photo.jpg")
+        self.assertEqual(attachments.display_name("photo.jpg", "png"), "photo.png")
+        self.assertEqual(attachments.display_name("archive.tar.txt", "txt"), "archive.tar.txt")
+
+    def test_only_the_last_part_of_a_path(self):
+        self.assertEqual(attachments.display_name(r"C:\Users\ann\a.png", "png"), "a.png")
+        self.assertEqual(attachments.display_name("../../etc/a.txt", "txt"), "a.txt")
+
+    def test_invisible_characters_are_dropped(self):
+        # U+202E would show "gpj.exe" as "exe.jpg".
+        self.assertEqual(attachments.display_name("a\u202egpj.exe.png", "png"), "agpj.exe.png")
+        self.assertEqual(attachments.display_name("a\x00b\u200bc.txt", "txt"), "abc.txt")
+        self.assertEqual(attachments.display_name("  two \t\n words  .txt", "txt"), "two words.txt")
+
+    def test_empty_name(self):
+        for name in ("", None, ".txt", " .txt", "...txt", "\u202e.txt"):
+            with self.subTest(name=name):
+                self.assertEqual(attachments.display_name(name, "txt"), "file.txt")
+
+    def test_long_name_is_cut(self):
+        name = attachments.display_name("я" * 1000 + ".png", "png")
+        self.assertEqual(len(name), attachments.MAX_NAME_LENGTH)
+        self.assertTrue(name.endswith("я.png"))

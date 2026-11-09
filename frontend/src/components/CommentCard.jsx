@@ -17,12 +17,15 @@ export function Avatar({ name }) {
 
 function Attachment({ comment }) {
   const openLightbox = useLightbox();
-  const title = `Вложение от ${comment.username}`;
+  // Comments saved before names were kept have none.
+  const name = comment.attachmentName;
+  const title = name || `Вложение от ${comment.username}`;
 
   if (comment.attachmentType === "IMAGE") {
-    return (
+    const thumbnail = (
       <button
         type="button"
+        title={name || undefined}
         className={cx(
           "group/thumb relative block cursor-zoom-in overflow-hidden rounded-xl border border-line bg-subtle",
           focusRing,
@@ -31,7 +34,7 @@ function Attachment({ comment }) {
       >
         <img
           src={comment.attachment}
-          alt="Вложение: изображение"
+          alt={name ? `Вложение: ${name}` : "Вложение: изображение"}
           loading="lazy"
           className="block max-h-40 max-w-56 object-cover transition duration-300 group-hover/thumb:scale-105"
         />
@@ -40,20 +43,36 @@ function Attachment({ comment }) {
         </span>
       </button>
     );
+    if (!name) return thumbnail;
+    return (
+      <figure className="flex w-fit max-w-56 flex-col gap-1">
+        {thumbnail}
+        <figcaption className="truncate text-xs text-muted" aria-hidden="true">
+          {name}
+        </figcaption>
+      </figure>
+    );
   }
   return (
     <button
       type="button"
+      title={name || undefined}
       className={cx(
-        "inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-subtle px-3 py-2 text-sm font-medium transition",
+        "inline-flex max-w-full cursor-pointer items-center gap-2 rounded-lg border border-line bg-subtle px-3 py-2 text-sm font-medium transition",
         "hover:border-accent/40 hover:bg-accent-soft hover:text-accent-ink",
         focusRing,
       )}
       onClick={() => openLightbox({ type: "text", src: comment.attachment, title })}
     >
-      <FileText className="size-4" aria-hidden="true" />
-      Текстовый файл
-      <span className="text-xs font-normal text-muted">.txt</span>
+      <FileText className="size-4 shrink-0" aria-hidden="true" />
+      {name ? (
+        <span className="min-w-0 truncate">{name}</span>
+      ) : (
+        <>
+          Текстовый файл
+          <span className="text-xs font-normal text-muted">.txt</span>
+        </>
+      )}
     </button>
   );
 }

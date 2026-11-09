@@ -42,6 +42,8 @@ type Comment {
   homePage: String!                 # "" если не указан
   text: String!                     # очищенный XHTML
   attachment: String                # "/media/attachments/2026/11/<uuid>.jpg" или null
+  attachmentName: String            # исходное имя файла, например "отпуск.jpg"; null без вложения
+                                    # и у комментариев, сохранённых до появления поля
   attachmentType: AttachmentType    # null, если вложения нет
   createdAt: String!                # ISO 8601 с часовым поясом
   replyCount: Int!                  # только прямые ответы
@@ -199,6 +201,7 @@ map        = {"0": ["variables.attachment"]}
 
 - Путь в бакете: `attachments/ГГГГ/ММ/<uuid>.<расширение>`.
 - В `Comment.attachment` возвращается ссылка `/media/<путь>`. Прямые ссылки на бакет заблокирует CSP клиента.
+- Исходное имя файла хранится только в базе, для показа в `Comment.attachmentName`: от пути остаётся последняя часть, управляющие и невидимые символы (категория Unicode C, в том числе смена направления текста) удаляются, пробелы схлопываются, длина — не больше 255 символов. Расширение заменяется тем, с которым файл сохранён: PNG, присланный как `photo.jpg`, называется `photo.png`. Пустое имя становится `file.<расширение>`.
 - `Content-Type` объекта: `image/jpeg`, `image/png`, `image/gif` или `text/plain; charset=utf-8`.
 - Настройки подключения: `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`. В boto3 для OCI нужны `addressing_style="path"`, `signature_version="s3v4"` и `request_checksum_calculation="when_required"`.
 

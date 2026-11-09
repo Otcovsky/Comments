@@ -10,6 +10,7 @@ const COMMENT_FIELDS = `
   homePage
   text
   attachment
+  attachmentName
   attachmentType
   createdAt
   replyCount

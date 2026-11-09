@@ -14,7 +14,7 @@ CREATE = """
 mutation Create($input: CommentInput!, $attachment: Upload) {
   createComment(input: $input, attachment: $attachment) {
     comment {
-      id parentId rootId username email homePage text attachment attachmentType createdAt replyCount
+      id parentId rootId username email homePage text attachment attachmentName attachmentType createdAt replyCount
     }
     token
     tokenExpiresIn

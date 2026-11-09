@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -28,6 +29,8 @@ IMAGE_FORMATS = {
 RESIZABLE_MODES = ("L", "LA", "RGB", "RGBA")
 # Only \t, \n, \f and \r are allowed among the control characters.
 CONTROL_CHARACTERS = re.compile("[\x00-\x08\x0b\x0e-\x1f\x7f]")
+MAX_NAME_LENGTH = 255  # Comment.attachment_name
+DEFAULT_NAME_STEM = "file"
 
 BAD_IMAGE = "Файл не является корректным изображением."
 
@@ -53,6 +56,19 @@ def process(upload):
     if extension in IMAGE_EXTENSIONS:
         return _process_image(upload)
     raise AttachmentError("Допустимые форматы: JPG, GIF, PNG или TXT.")
+
+
+def display_name(name, extension):
+    """The name of the upload to show next to the comment. Only the last part of a path stays,
+    and characters of category C (controls, and format marks such as the right-to-left override
+    that would show "gpj.exe" as "exe.jpg") are dropped. The extension becomes the one the file
+    was stored with: a PNG sent as photo.jpg is shown as photo.png."""
+    name = re.split(r"[\\/]", name or "")[-1]
+    chars = (" " if char.isspace() else char for char in name)
+    name = " ".join("".join(char for char in chars if not unicodedata.category(char).startswith("C")).split())
+    stem = name.rpartition(".")[0] if "." in name else name
+    stem = stem.strip(" .")[: MAX_NAME_LENGTH - len(extension) - 1].rstrip(" .") or DEFAULT_NAME_STEM
+    return f"{stem}.{extension}"
 
 
 def _process_text(upload):

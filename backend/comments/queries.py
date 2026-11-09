@@ -42,6 +42,7 @@ ROW_FIELDS = (
     "author__home_page",
     "text",
     "attachment",
+    "attachment_name",
     "attachment_type",
     "created_at",
     "reply_count",
@@ -219,7 +220,9 @@ def find_parent(comment_id):
     return Comment.objects.filter(pk=comment_id).values("id", "parent_id", "root_id").first()
 
 
-def save_comment(*, username, email, home_page, parent, text, attachment, attachment_type, ip_address, user_agent):
+def save_comment(
+    *, username, email, home_page, parent, text, attachment, attachment_name, attachment_type, ip_address, user_agent
+):
     # In autocommit on purpose: inside a REPEATABLE READ transaction a lost get_or_create race
     # could not read the row that beat it. A single INSERT needs no transaction anyway.
     author, _ = Author.objects.get_or_create(
@@ -231,6 +234,7 @@ def save_comment(*, username, email, home_page, parent, text, attachment, attach
         root_id=(parent["root_id"] or parent["id"]) if parent else None,
         text=text,
         attachment=attachment,
+        attachment_name=attachment_name,
         attachment_type=attachment_type,
         ip_address=ip_address,
         user_agent=user_agent,
@@ -244,6 +248,7 @@ def save_comment(*, username, email, home_page, parent, text, attachment, attach
         "author__home_page": author.home_page,
         "text": comment.text,
         "attachment": comment.attachment,
+        "attachment_name": comment.attachment_name,
         "attachment_type": comment.attachment_type,
         "created_at": comment.created_at,
         "reply_count": 0,

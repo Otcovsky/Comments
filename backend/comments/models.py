@@ -42,6 +42,8 @@ class Comment(models.Model):
     text = models.TextField(help_text="Sanitized XHTML with allowed tags only")
     # The object's key in the bucket; clients get it under /media/.
     attachment = models.CharField(max_length=100, blank=True)
+    # The name the file had on the author's computer, cleaned, for showing only (attachments.display_name).
+    attachment_name = models.CharField(max_length=255, blank=True)
     attachment_type = models.CharField(
         max_length=10, choices=AttachmentType.choices, blank=True, default=AttachmentType.NONE
     )

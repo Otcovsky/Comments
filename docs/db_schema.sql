@@ -27,6 +27,7 @@ CREATE TABLE `comments_comment` (
   `root_id` BIGINT NULL COMMENT 'Top-level comment of the thread; NULL for top-level comments',
   `text` LONGTEXT NOT NULL COMMENT 'Sanitized XHTML: only a, code, i, strong',
   `attachment` VARCHAR(100) NOT NULL COMMENT 'Object key in the bucket; empty if there is no file',
+  `attachment_name` VARCHAR(255) NOT NULL COMMENT 'Original file name, cleaned, for display; empty if there is no file',
   `attachment_type` VARCHAR(10) NOT NULL COMMENT '"", image, text',
   `ip_address` CHAR(39) NULL,
   `user_agent` VARCHAR(255) NOT NULL,

@@ -33,7 +33,7 @@ COMMENTS = """
 query Comments($page: Int!, $pageSize: Int!, $ordering: CommentOrdering!) {
   comments(page: $page, pageSize: $pageSize, ordering: $ordering) {
     count
-    results { id username attachment attachmentType createdAt replyCount parentId rootId homePage }
+    results { id username attachment attachmentName attachmentType createdAt replyCount parentId rootId homePage }
   }
 }
 """
@@ -113,13 +113,15 @@ class ListTests(TransactionTestCase):
 
     async def test_attachment_link(self):
         await sync_to_async(make_comment)(
-            self.ann, attachment="attachments/2026/11/a.jpg", attachment_type="image"
+            self.ann, attachment="attachments/2026/11/a.jpg", attachment_name="отпуск.jpg", attachment_type="image"
         )
         await sync_to_async(make_comment)(self.bob)
         rows = (await self.results(ordering="CREATED_AT_ASC"))["results"]
         self.assertEqual(rows[0]["attachment"], "/media/attachments/2026/11/a.jpg")
+        self.assertEqual(rows[0]["attachmentName"], "отпуск.jpg")
         self.assertEqual(rows[0]["attachmentType"], "IMAGE")
         self.assertIsNone(rows[1]["attachment"])
+        self.assertIsNone(rows[1]["attachmentName"])
         self.assertIsNone(rows[1]["attachmentType"])
 
     async def test_replies_are_direct_and_newest_first(self):
@@ -311,9 +313,10 @@ class UploadTests(TransactionTestCase):
 
     async def test_image(self):
         with self.bucket() as client:
-            payload = await self.send("a.png", png())
+            payload = await self.send("Отпуск 2026.PNG", png())
         comment = payload["data"]["createComment"]["comment"]
         self.assertEqual(comment["attachmentType"], "IMAGE")
+        self.assertEqual(comment["attachmentName"], "Отпуск 2026.png")
         self.assertRegex(comment["attachment"], r"^/media/attachments/\d{4}/\d{2}/[0-9a-f]{32}\.png$")
         stored = client.return_value.put_object.call_args.kwargs
         self.assertEqual(f"/media/{stored['Key']}", comment["attachment"])
@@ -322,8 +325,12 @@ class UploadTests(TransactionTestCase):
 
     async def test_text(self):
         with self.bucket() as client:
-            payload = await self.send("a.txt", b"hello")
-        self.assertEqual(payload["data"]["createComment"]["comment"]["attachmentType"], "TEXT")
+            payload = await self.send("notes.txt", b"hello")
+        comment = payload["data"]["createComment"]["comment"]
+        self.assertEqual(comment["attachmentType"], "TEXT")
+        self.assertEqual(comment["attachmentName"], "notes.txt")
+        # Saved, not only returned: the list reads it from the row.
+        self.assertEqual(await Comment.objects.values_list("attachment_name", flat=True).aget(), "notes.txt")
         self.assertEqual(client.return_value.put_object.call_args.kwargs["Body"], b"hello")
 
     async def test_bad_file_means_no_comment(self):
