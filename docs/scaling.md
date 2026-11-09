@@ -50,7 +50,7 @@ RESET=0 SEED_ARGS="--top 200000 --replies 800000 --authors 100000 --seed 42" TOP
 
 ## Замеры
 
-Прогоны лежат в `perf/results/`.
+Прогоны лежат в `perf/results/`, их разбор с коммитами — в `perf/results/OPTIMIZATIONS.md`, раздел 9.
 
 | Прогон | Что | Результат |
 |---|---|---|
